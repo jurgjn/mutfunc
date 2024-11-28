@@ -1,0 +1,9 @@
+matplotlib
+seaborn
+streamlit
+# stmol & dependencies: https://github.com/napoles-uach/stmol
+stmol==0.0.9
+py3Dmol==2.0.0.post2
+ipyspeck==0.6.1
+ipywidgets==7.6.3
+ipython_genutils
