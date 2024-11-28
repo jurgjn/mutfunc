@@ -63,13 +63,13 @@ def parse_varstr(s):
     return uniprot_id, aa_pos, aa_ref, aa_alt
 
 
-col1, col2 = st.columns(2)
-st.write('## Selected variant')
 uniprot_id, aa_pos, aa_ref, aa_alt = parse_varstr(r_sel_.variant_id)
 #st.write(uniprot_id)
 #st.write(aa_pos)
 #st.write(aa_ref)
 #st.write(aa_alt)
+
+col1, col2 = st.columns(2)
 
 @st.cache_resource
 def read_af2_v4(af2_id):
@@ -78,7 +78,7 @@ def read_af2_v4(af2_id):
         return url.read().decode('utf-8')
 
 with col1:
-    st.write('### Structure')
+    st.write('### Structure with variant')
     #st.write(len(read_af2_v4(uniprot_id)))
     pdb_ = read_af2_v4(uniprot_id)
     xyzview = py3Dmol.view()
@@ -109,7 +109,13 @@ with col1:
         {'resi': aa_pos},
     )
     xyzview.setBackgroundColor('#eeeeee')
-    xyzview.zoomTo()
+    #xyzview.zoomTo({'resi': aa_pos}) # center exactly onto residue
+    xyzview.zoomTo({ # center onto within 30 Angostroms
+        'within': {
+            'distance': 30,
+            'sel': {'resi': aa_pos},
+        },
+    })
     stmol.showmol(xyzview, height=800, width=800)
 
 with col2:
