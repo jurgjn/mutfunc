@@ -19,9 +19,13 @@ st.set_page_config(
 )
 
 def query_missense(variants):
+    if len(variants) == 1:
+        variants_tuple = f"('{variants[0]}')"  # Single element tuple as string
+    else:
+        variants_tuple = str(tuple(variants))  # Normal tuple for multiple elements
     #https://stackoverflow.com/questions/28735213/pandas-read-sql-with-a-list-of-values-for-where-condition
     with sqlite3.connect('resources/missense_23.11.1.sqlite') as db:
-        df_ = pd.read_sql_query(sql='SELECT * FROM missense WHERE variant_id in ' + str(tuple(variants)), con=db)
+        df_ = pd.read_sql_query(sql='SELECT * FROM missense WHERE variant_id in ' + variants_tuple, con=db)
     return df_.replace({
         'pred_ddg': -99,
         'pocketscore': -99,
