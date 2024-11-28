@@ -86,19 +86,31 @@ with col1:
     # Add structure
     xyzview.addModel(pdb_, format='pdb')
 
-    xyzview.setStyle({'model': 0}, {
+    xyzview.setStyle({'model': 0}, {    
         'cartoon': {
-            'colorscheme': {
-                'prop': 'resi',
-                #'map': colors_pocket,
-            },
+            #'color': 'grey',
+            #'colorscheme': {
+            #    'prop': 'resi',
+            #    #'map': colors_pocket,
+            #},
             'arrows': True,
         }
     })
 
+    xyzview.addStyle({'resi': aa_pos}, {'stick': {'colorscheme': 'purpleCarbon'}})
+    xyzview.addLabel( #https://3dmol.org/doc/GLViewer.html#addLabel
+        f'{aa_ref}{aa_pos}',
+        { #https://3dmol.csb.pitt.edu/doc/LabelSpec.html
+            'fontColor': 'red' if r_sel_.am_class == 'pathogenic' else 'blue' if r_sel_.am_class == 'benign' else 'gray',
+            'backgroundColor': 'lightgray',
+            #'fontOpacity': 0.5,
+            'backgroundOpacity': 0.8,
+        },
+        {'resi': aa_pos},
+    )
     xyzview.setBackgroundColor('#eeeeee')
     xyzview.zoomTo()
-    stmol.showmol(xyzview, height=600, width=600)
+    stmol.showmol(xyzview, height=800, width=800)
 
 with col2:
     st.write('### Variant details')
