@@ -54,8 +54,8 @@ def fetch_variant_info(variants):
     response = requests.post(f"{server}{endpoint}", headers=headers, json=data)
 
     # Debugging: Print raw response data
-    st.subheader("Debugging: Raw API Response")
-    st.json(response.json())  # Display raw JSON response in the app
+    #st.subheader("Debugging: Raw API Response")
+    #st.json(response.json())  # Display raw JSON response in the app
 
     if response.status_code != 200:
         st.error(f"Error {response.status_code}: {response.json().get('error', 'Unknown error')}")
@@ -82,13 +82,13 @@ def query_prot_ids(ensemble_ids):
     # Submit a mapping request to UniProt
     request = IdMappingClient.submit(source="Ensembl_Protein", dest="UniProtKB-Swiss-Prot", ids=set(ensemble_ids))
     result = list(request.each_result())
-    
-    st.write(result)
+
+    # TODO: add try except and waiting logic if result takes time
+
     #mapping = {e["from"]: e["to"] for e in result}
 
     # Get UniProt IDs and convert them to internal IDs with variants
     uniprot_ids = set({e["to"] for e in result})#set(mapping.values())
-    st.write(uniprot_ids)
     internal_ids = [convert_to_internal_id(uniprot_id, variants[0]) for uniprot_id in uniprot_ids]
 
     return internal_ids  # Return results if successful
@@ -107,14 +107,6 @@ def process_variant_info(variant_info):
             input_variant = details.get("input", "N/A")
             hgvsp = details.get("hgvsp", [])
             protein_ids = query_prot_ids(hgvsp)
-            """for protein in protein_ids:
-                rows.append({
-                            "Input Variant": input_variant,
-                            "Nucleotide Change": nucleotide,
-                            "HGVSp": hgvsp,
-                            "Protein ID": protein,
-                        })
-            """
 
     return protein_ids #pd.DataFrame(rows)
 
@@ -158,7 +150,7 @@ if st.sidebar.button("Analyze Variants"):
                 st.error(f"An error occurred: {e}")
 
     st.write('## Variants')
-    #df_ = query_missense(['P09874/S568F', 'P09874/D678H', 'Q96NU1/R28Q', 'P00451/G41C'])
+    #df_ = query_missense(['P09874/S568F', 'P01019/T259M'])#, 'P09874/D678H', 'Q96NU1/R28Q', 'P00451/G41C', 'P01019/T259M'])
     df_ = query_missense(results_df)
     event = st.dataframe(
         df_,
