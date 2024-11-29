@@ -10,6 +10,9 @@ from Bio.Data.IUPACData import protein_letters_3to1
 import time
 #, streamlit_ext as ste, st_aggrid, py3Dmol, stmol
 
+import util.variant_parser as vp
+import util.db_utils as db
+
 st.cache_resource.clear()
 
 st.set_page_config(
@@ -17,117 +20,6 @@ st.set_page_config(
     page_icon='🔬',
     layout='wide',
 )
-
-def query_missense(variants):
-    if len(variants) == 1:
-        variants_tuple = f"('{variants[0]}')"  # Single element tuple as string
-    else:
-        variants_tuple = str(tuple(variants))  # Normal tuple for multiple elements
-    #https://stackoverflow.com/questions/28735213/pandas-read-sql-with-a-list-of-values-for-where-condition
-    with sqlite3.connect('resources/missense_23.11.1.sqlite') as db:
-        df_ = pd.read_sql_query(sql='SELECT * FROM missense WHERE variant_id in ' + variants_tuple, con=db)
-    return df_.replace({
-        'pred_ddg': -99,
-        'pocketscore': -99,
-        'pocketrank': -99,
-        'interface': -99,
-        'interface_strict': -99,
-        'freq': -99,
-    }, np.nan)
-
-# Function to query the Ensembl REST API
-def fetch_variant_info(variants):
-    """
-    Fetch variant information from the Ensembl Variant Recoder endpoint.
-
-    Parameters:
-    - variants: List of variant identifiers (e.g., rsIDs, HGVS notations).
-
-    Returns:
-    - JSON response from the API.
-    """
-    server = "https://rest.ensembl.org"
-    endpoint = "/variant_recoder/homo_sapiens"
-    headers = {"Content-Type": "application/json"}
-    
-    if not variants:
-        return []
-
-    # For batch queries, use POST request
-    data = {"ids": variants}
-    response = requests.post(f"{server}{endpoint}", headers=headers, json=data)
-
-    # Debugging: Print raw response data
-    #st.subheader("Debugging: Raw API Response")
-    #st.json(response.json())  # Display raw JSON response in the app
-
-    if response.status_code != 200:
-        st.error(f"Error {response.status_code}: {response.json().get('error', 'Unknown error')}")
-        return []
-
-    return response.json()
-
-
-def query_prot_ids(ensemble_ids):
-    """
-    Query UniProt for protein IDs mapped from Ensembl Protein IDs.
-
-    Parameters:
-    - ensemble_ids: List of Ensembl Protein IDs with variants (e.g., "ENSP00000483018.1:p.Gly229Asp").
-
-    Returns:
-    - List of UniProt internal IDs with variants.
-    """
-    # Split the IDs into ENSP and variant
-    ensemble_ids = [element.split(":") for element in ensemble_ids]
-    variants = [e[1][2:] for e in ensemble_ids] # remove ".p"
-    ensemble_ids = [e[0] for e in ensemble_ids]
-
-    # Submit a mapping request to UniProt
-    request = IdMappingClient.submit(source="Ensembl_Protein", dest="UniProtKB-Swiss-Prot", ids=set(ensemble_ids))
-
-    max_retries = 10  # Maximum number of retries
-    retry_count = 0
-    with st.spinner("Looking up Uniprot ids..."):
-        while retry_count < max_retries:
-            try:
-                result = list(request.each_result())
-            except Exception as e:
-                st.info(f"Failed to fetch UniProt IDs. Retrying... ({retry_count}/{max_retries})")
-                retry_count += 1
-                time.sleep(2)
-                continue
-            break
-
-    # TODO: add try except and waiting logic if result takes time
-
-    #mapping = {e["from"]: e["to"] for e in result}
-
-    # Get UniProt IDs and convert them to internal IDs with variants
-    uniprot_ids = set({e["to"] for e in result})#set(mapping.values())
-    internal_ids = [convert_to_internal_id(uniprot_id, variants[0]) for uniprot_id in uniprot_ids]
-
-    return internal_ids  # Return results if successful
-
-def convert_to_internal_id(uniprot_id, variant):
-    position = variant[3:-3]
-    short_variant = protein_letters_3to1[variant[-3:]]+position+protein_letters_3to1[variant[:3]]
-    return uniprot_id+"/"+short_variant
-
-# Function to process the API response into a structured DataFrame
-def process_variant_info(variant_info):
-    # get the proteins 
-    rows = []
-    all_hgvsp = []
-    for variant in variant_info:
-        for nucleotide, details in variant.items():
-            input_variant = details.get("input", "N/A")
-            hgvsp = details.get("hgvsp", [])
-            all_hgvsp.extend(hgvsp)
-
-    protein_ids = query_prot_ids(all_hgvsp)
-
-    return protein_ids #pd.DataFrame(rows)
 
 # Streamlit app
 st.title("Mutfunc - let's get funky with mutations! 🧬")
@@ -140,42 +32,12 @@ manual_input = st.text_area("Enter genomic variants (one per line)")
 prot_variants = []  # List for protein variants
 rs_variants = []    # List for rs IDs
 
-def parse_variants(variant_lines):
-    """
-    Parse a list of variant lines into structured lists for rs IDs and protein variants.
-
-    Parameters:
-    - variant_lines: List of strings, each representing a variant.
-
-    Returns:
-    - A tuple of two lists: rs_variants and prot_variants.
-    """
-    rs_variants = []
-    prot_variants = []
-    for line in variant_lines:
-        stripped_line = line.strip()
-        if stripped_line:
-            # Check if it's an rs ID or a protein ID
-            if stripped_line.startswith("rs"):
-                rs_variants.append(stripped_line)
-            else:
-                # Split the line into protein ID and mutation
-                parts = stripped_line.split()
-                if len(parts) == 2:
-                    protein_id, mutation = parts
-                    #prot_variants.append({"protein": protein_id, "mutation": mutation})
-                    prot_variants.append(f"{protein_id}/{mutation}")
-                else:
-                    st.warning(f"Invalid format in line: {stripped_line}. Expected 'proteinID mutation'.")
-    return rs_variants, prot_variants
-
-
 # Handle uploaded file
 if uploaded_file is not None:
     try:
         # Assuming the file is a plain text file or CSV with one column of variants
         file_content = pd.read_csv(uploaded_file, header=None)
-        rs, prot = parse_variants(file_content[0].tolist())
+        rs, prot = vp.parse_variants(file_content[0].tolist())
         rs_variants.extend(rs)
         prot_variants.extend(prot)
     except Exception as e:
@@ -183,7 +45,7 @@ if uploaded_file is not None:
 
 # Handle manual input
 if manual_input:
-    rs, prot = parse_variants(manual_input.split("\n"))
+    rs, prot = vp.parse_variants(manual_input.split("\n"))
     rs_variants.extend(rs)
     prot_variants.extend(prot)
 
@@ -195,12 +57,12 @@ if st.sidebar.button("Analyze Variants"):
             try:
                 with st.spinner("Fetching variant information from Ensembl..."):
                     # Fetch variant information from the Variant Recoder API
-                    variant_info = fetch_variant_info(rs_variants)
+                    variant_info = vp.fetch_variant_info(rs_variants)
                     if not variant_info:
                         st.error("No information was returned for the provided variants.")
                     else:
                         # Process the JSON response into a DataFrame
-                        results_df = process_variant_info(variant_info)
+                        results_df = vp.process_variant_info(variant_info)
                         prot_variants.extend(results_df)
                         #st.subheader("Processed Variant Results")
                         #st.dataframe(results_df)
@@ -211,7 +73,7 @@ if st.sidebar.button("Analyze Variants"):
     st.write('## Variants')
     #df_ = query_missense(['P09874/S568F', 'P01019/T259M'])#, 'P09874/D678H', 'Q96NU1/R28Q', 'P00451/G41C', 'P01019/T259M'])
     st.write(prot_variants)
-    df_ = query_missense(prot_variants)
+    df_ = db.query_missense(prot_variants)
     event = st.dataframe(
         df_,
         column_order = ['variant_id', 'am_pathogenicity', 'am_class', 'pred_ddg', 'pocketscore', 'interface'],
@@ -230,25 +92,7 @@ if st.sidebar.button("Analyze Variants"):
     r_sel_ = df_.loc[sel_variant_index_].squeeze()
     #st.write(r_sel_.variant_id)
 
-    def parse_variant_id(variant_id):
-        # df_var[['uniprot_id', 'aa_pos', 'aa_ref', 'aa_alt']] = df_var.apply(lambda r: parse_varstr(r['protein_variant']), axis=1, result_type='expand')
-        aa_pos = int(variant_id[1:-1])
-        aa_ref = variant_id[0]
-        aa_alt = variant_id[-1]
-        #print(uniprot_id, aa_pos, aa_ref, aa_alt)
-        return aa_pos, aa_ref, aa_alt
-
-    def parse_varstr(s):
-        # df_var[['uniprot_id', 'aa_pos', 'aa_ref', 'aa_alt']] = df_var.apply(lambda r: parse_varstr(r['protein_variant']), axis=1, result_type='expand')
-        uniprot_id, variant_id = s.split('/')
-        aa_pos = int(variant_id[1:-1])
-        aa_ref = variant_id[0]
-        aa_alt = variant_id[-1]
-        #print(uniprot_id, aa_pos, aa_ref, aa_alt)
-        return uniprot_id, aa_pos, aa_ref, aa_alt
-
-
-    uniprot_id, aa_pos, aa_ref, aa_alt = parse_varstr(r_sel_.variant_id)
+    uniprot_id, aa_pos, aa_ref, aa_alt = db.parse_varstr(r_sel_.variant_id)
     #st.write(uniprot_id)
     #st.write(aa_pos)
     #st.write(aa_ref)
