@@ -16,7 +16,7 @@ prot_variants = st.session_state.get("prot_variants", [])
 rs_variants = st.session_state.get("rs_variants", [])
 
 with col1:
-    manual_input = st.text_area("Enter genomic variants (one per line)")
+    manual_input = st.text_area("Enter genomic variants (one per line)", value = "rs699\nP00533 R132C\nP09874 S568F\nP00451 G41C")#, 'P09874/D678H', 'Q96NU1/R28Q', 'P00451/G41C', 'P01019/T259M'])")
 
 with col2:
     uploaded_file = st.file_uploader("Upload a file containing genomic variants", type=["txt", "csv"])
