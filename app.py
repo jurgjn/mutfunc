@@ -85,7 +85,19 @@ def query_prot_ids(ensemble_ids):
 
     # Submit a mapping request to UniProt
     request = IdMappingClient.submit(source="Ensembl_Protein", dest="UniProtKB-Swiss-Prot", ids=set(ensemble_ids))
-    result = list(request.each_result())
+
+    max_retries = 10  # Maximum number of retries
+    retry_count = 0
+    with st.spinner("Looking up Uniprot ids..."):
+        while retry_count < max_retries:
+            try:
+                result = list(request.each_result())
+            except Exception as e:
+                st.info(f"Failed to fetch UniProt IDs. Retrying... ({retry_count}/{max_retries})")
+                retry_count += 1
+                time.sleep(2)
+                continue
+            break
 
     # TODO: add try except and waiting logic if result takes time
 
@@ -106,56 +118,100 @@ def convert_to_internal_id(uniprot_id, variant):
 def process_variant_info(variant_info):
     # get the proteins 
     rows = []
+    all_hgvsp = []
     for variant in variant_info:
         for nucleotide, details in variant.items():
             input_variant = details.get("input", "N/A")
             hgvsp = details.get("hgvsp", [])
-            protein_ids = query_prot_ids(hgvsp)
+            all_hgvsp.extend(hgvsp)
+
+    protein_ids = query_prot_ids(all_hgvsp)
 
     return protein_ids #pd.DataFrame(rows)
+
+# Streamlit app
+st.title("Mutfunc - let's get funky with mutations! 🧬")
 
 # Sidebar for input
 st.sidebar.header("Input Variants")
 uploaded_file = st.sidebar.file_uploader("Upload a file containing genomic variants", type=["txt", "csv"])
 manual_input = st.text_area("Enter genomic variants (one per line)")
 
-variants = []
+prot_variants = []  # List for protein variants
+rs_variants = []    # List for rs IDs
+
+def parse_variants(variant_lines):
+    """
+    Parse a list of variant lines into structured lists for rs IDs and protein variants.
+
+    Parameters:
+    - variant_lines: List of strings, each representing a variant.
+
+    Returns:
+    - A tuple of two lists: rs_variants and prot_variants.
+    """
+    rs_variants = []
+    prot_variants = []
+    for line in variant_lines:
+        stripped_line = line.strip()
+        if stripped_line:
+            # Check if it's an rs ID or a protein ID
+            if stripped_line.startswith("rs"):
+                rs_variants.append(stripped_line)
+            else:
+                # Split the line into protein ID and mutation
+                parts = stripped_line.split()
+                if len(parts) == 2:
+                    protein_id, mutation = parts
+                    #prot_variants.append({"protein": protein_id, "mutation": mutation})
+                    prot_variants.append(f"{protein_id}/{mutation}")
+                else:
+                    st.warning(f"Invalid format in line: {stripped_line}. Expected 'proteinID mutation'.")
+    return rs_variants, prot_variants
+
 
 # Handle uploaded file
 if uploaded_file is not None:
     try:
         # Assuming the file is a plain text file or CSV with one column of variants
         file_content = pd.read_csv(uploaded_file, header=None)
-        variants.extend(file_content[0].tolist())
+        rs, prot = parse_variants(file_content[0].tolist())
+        rs_variants.extend(rs)
+        prot_variants.extend(prot)
     except Exception as e:
         st.sidebar.error("Failed to read the uploaded file. Please ensure it contains variants in one column.")
 
 # Handle manual input
 if manual_input:
-    variants.extend([line.strip() for line in manual_input.split("\n") if line.strip()])
+    rs, prot = parse_variants(manual_input.split("\n"))
+    rs_variants.extend(rs)
+    prot_variants.extend(prot)
 
 if st.sidebar.button("Analyze Variants"):
-    if not variants:
+    if not prot_variants and not rs_variants:
         st.warning("No variants provided. Please upload a file or enter variants manually.")
     else:
-        with st.spinner("Fetching variant information from Ensembl..."):
+        if rs_variants:
             try:
-                # Fetch variant information from the Variant Recoder API
-                variant_info = fetch_variant_info(variants)
-                if not variant_info:
-                    st.error("No information was returned for the provided variants.")
-                else:
-                    # Process the JSON response into a DataFrame
-                    results_df = process_variant_info(variant_info)
-                    #st.subheader("Processed Variant Results")
-                    #st.dataframe(results_df)
-                    #st.download_button("Download Results as CSV", results_df.to_csv(index=False), "variant_results.csv", "text/csv")
+                with st.spinner("Fetching variant information from Ensembl..."):
+                    # Fetch variant information from the Variant Recoder API
+                    variant_info = fetch_variant_info(rs_variants)
+                    if not variant_info:
+                        st.error("No information was returned for the provided variants.")
+                    else:
+                        # Process the JSON response into a DataFrame
+                        results_df = process_variant_info(variant_info)
+                        prot_variants.extend(results_df)
+                        #st.subheader("Processed Variant Results")
+                        #st.dataframe(results_df)
+                        #st.download_button("Download Results as CSV", results_df.to_csv(index=False), "variant_results.csv", "text/csv")
             except Exception as e:
-                st.error(f"An error occurred: {e}")
+                st.error(f"An error occurred when transforming the variants: {e}")
 
     st.write('## Variants')
     #df_ = query_missense(['P09874/S568F', 'P01019/T259M'])#, 'P09874/D678H', 'Q96NU1/R28Q', 'P00451/G41C', 'P01019/T259M'])
-    df_ = query_missense(results_df)
+    st.write(prot_variants)
+    df_ = query_missense(prot_variants)
     event = st.dataframe(
         df_,
         column_order = ['variant_id', 'am_pathogenicity', 'am_class', 'pred_ddg', 'pocketscore', 'interface'],
