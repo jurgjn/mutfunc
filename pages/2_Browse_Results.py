@@ -9,7 +9,7 @@ st.set_page_config(
     layout='wide',
 )
 
-st.title("Mutfunc - Browse Results 🧬")
+st.title("Mutfunc - Browse Results 🕵️‍♂️")
 
 prot_variants = st.session_state.get("prot_variants", {})
 
@@ -55,7 +55,7 @@ else:
         #st.write(aa_alt)
 
     with col2:
-        st.write('### Structure with variant')
+        #st.write('### Structure with variant')
         #st.write(len(read_af2_v4(uniprot_id)))
         pdb_ = read_af2_v4(uniprot_id)
         xyzview = py3Dmol.view()
@@ -65,7 +65,7 @@ else:
 
         xyzview.setStyle({'model': 0}, {    
             'cartoon': {
-                #'color': 'grey',
+                'color': 'lightgrey',#'white',
                 #'colorscheme': {
                 #    'prop': 'resi',
                 #    #'map': colors_pocket,
@@ -93,6 +93,6 @@ else:
                 'sel': {'resi': aa_pos},
             },
         })
-        stmol.showmol(xyzview, height=800, width=800)
+        stmol.showmol(xyzview, width=800)
         st.write('### Variant details')
         st.dataframe(r_sel_, use_container_width=True, height=800)
