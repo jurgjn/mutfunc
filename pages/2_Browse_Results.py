@@ -11,10 +11,9 @@ st.set_page_config(
 
 st.title("Mutfunc - Browse Results 🧬")
 
-prot_variants = st.session_state.get("prot_variants", [])
-rs_variants = st.session_state.get("rs_variants", [])
+prot_variants = st.session_state.get("prot_variants", {})
 
-st.write(prot_variants)
+#st.write(prot_variants)
 
 @st.cache_resource
 def read_af2_v4(af2_id):
@@ -25,13 +24,15 @@ def read_af2_v4(af2_id):
 if not prot_variants:
     st.info("No variants available for browsing. Please input variants first.")
 else:
-    df_ = db.query_missense(prot_variants)
-
+    internal_ids = list(prot_variants.keys())
+    #st.write(prot_variants)
+    df_ = db.query_missense(internal_ids)
+    df_['input_variant'] = df_['variant_id'].apply(lambda x: prot_variants[x])
     col1, col2 = st.columns(2)
     with col1:
         event = st.dataframe(
             df_,
-            column_order = ['variant_id', 'am_pathogenicity', 'am_class', 'pred_ddg', 'pocketscore', 'interface'],
+            column_order = ['input_variant','variant_id', 'am_pathogenicity', 'am_class', 'pred_ddg', 'pocketscore', 'interface'],
             #column_config=column_configuration,
             use_container_width=True,
             hide_index=True,
@@ -93,6 +94,5 @@ else:
             },
         })
         stmol.showmol(xyzview, height=800, width=800)
-
         st.write('### Variant details')
         st.dataframe(r_sel_, use_container_width=True, height=800)

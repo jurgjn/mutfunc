@@ -12,7 +12,7 @@ st.title("Mutfunc - Input Variants 🧬")
 
 col1, col2 = st.columns(2)
 
-prot_variants = st.session_state.get("prot_variants", [])
+prot_variants = st.session_state.get("prot_variants", {}) # TODO maybe reset this
 rs_variants = st.session_state.get("rs_variants", [])
 
 with col1:
@@ -26,7 +26,7 @@ if uploaded_file is not None:
         file_content = pd.read_csv(uploaded_file, header=None)
         rs, prot = vp.parse_variants(file_content[0].tolist())
         rs_variants.extend(rs)
-        prot_variants.extend(prot)
+        prot_variants.update({p:p for p in prot})
         st.success("File processed successfully!")
     except Exception as e:
         st.error("Failed to read the uploaded file. Please ensure it contains variants in one column.")
@@ -34,8 +34,8 @@ if uploaded_file is not None:
 if manual_input:
     rs, prot = vp.parse_variants(manual_input.split("\n"))
     rs_variants.extend(rs)
-    prot_variants.extend(prot)
-    st.success("Manual input processed successfully!")
+    prot_variants.update({p:p for p in prot})
+    st.success("Manual input processed successfully!") # TODO: only print this on input/change 
 
 if st.button("Analyze Variants"):
     if not prot_variants and not rs_variants:
@@ -47,10 +47,8 @@ if st.button("Analyze Variants"):
                 if not variant_info:
                     st.error("No information was returned for the provided variants.")
                 else:
-                    results_df = vp.process_variant_info(variant_info)
-                    prot_variants.extend(results_df)
-                    st.session_state["prot_variants"] = prot_variants
-                    st.session_state["rs_variants"] = rs_variants
+                    translated_variants = vp.process_variant_info(variant_info)
+                    prot_variants.update(translated_variants)
                     st.success("Variants processed successfully!")
                     st.session_state["prot_variants"] = prot_variants
                     st.session_state["rs_variants"] = rs_variants

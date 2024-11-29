@@ -41,7 +41,7 @@ def fetch_variant_info(variants):
     return response.json()
 
 
-def query_prot_ids(ensemble_ids):
+def query_prot_ids(ensemble_ids, input_ids):
     """
     Query UniProt for protein IDs mapped from Ensembl Protein IDs.
 
@@ -55,6 +55,8 @@ def query_prot_ids(ensemble_ids):
     ensemble_ids = [element.split(":") for element in ensemble_ids]
     variants = [e[1][2:] for e in ensemble_ids] # remove ".p"
     ensemble_ids = [e[0] for e in ensemble_ids]
+
+    ensemble_to_input = dict(zip(ensemble_ids, input_ids))
 
     # Submit a mapping request to UniProt
     request = IdMappingClient.submit(source="Ensembl_Protein", dest="UniProtKB-Swiss-Prot", ids=set(ensemble_ids))
@@ -77,10 +79,13 @@ def query_prot_ids(ensemble_ids):
     #mapping = {e["from"]: e["to"] for e in result}
 
     # Get UniProt IDs and convert them to internal IDs with variants
-    uniprot_ids = set({e["to"] for e in result})#set(mapping.values())
+    uniprot_id_map = list(set({(e["from"], e["to"]) for e in result}))#set(mapping.values())
+    input_ids_left = [ensemble_to_input[e[0]] for e in uniprot_id_map]
+    uniprot_ids = [e[1] for e in uniprot_id_map]
+
     internal_ids = [convert_to_internal_id(uniprot_id, variants[0]) for uniprot_id in uniprot_ids]
 
-    return internal_ids  # Return results if successful
+    return dict(zip(internal_ids,input_ids_left)) # Return results if successful
 
 def convert_to_internal_id(uniprot_id, variant):
     position = variant[3:-3]
@@ -92,13 +97,15 @@ def process_variant_info(variant_info):
     # get the proteins 
     rows = []
     all_hgvsp = []
+    input_vars = []
     for variant in variant_info:
         for nucleotide, details in variant.items():
             input_variant = details.get("input", "N/A")
             hgvsp = details.get("hgvsp", [])
             all_hgvsp.extend(hgvsp)
+            input_vars.extend([input_variant]*len(hgvsp))
 
-    protein_ids = query_prot_ids(all_hgvsp)
+    protein_ids = query_prot_ids(all_hgvsp, input_vars)
 
     return protein_ids #pd.DataFrame(rows)
 
