@@ -13,5 +13,5 @@ scp euler.ethz.ch:/cluster/work/beltrao/jjaenes/23.11.01_human_protein_map/misse
 
 Run:
 ```
-streamlit run app.py
+streamlit run Mutfunc_Home.py
 ```
