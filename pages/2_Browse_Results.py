@@ -16,44 +16,44 @@ rs_variants = st.session_state.get("rs_variants", [])
 
 st.write(prot_variants)
 
+@st.cache_resource
+def read_af2_v4(af2_id):
+    url_ = f'https://alphafold.ebi.ac.uk/files/AF-{af2_id}-F1-model_v4.pdb'
+    with urllib.request.urlopen(url_) as url:
+        return url.read().decode('utf-8')
+
 if not prot_variants:
     st.info("No variants available for browsing. Please input variants first.")
 else:
     df_ = db.query_missense(prot_variants)
-    event = st.dataframe(
-        df_,
-        column_order = ['variant_id', 'am_pathogenicity', 'am_class', 'pred_ddg', 'pocketscore', 'interface'],
-        #column_config=column_configuration,
-        use_container_width=True,
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="single-row",
-    )
-    #st.write(event)
-    if len(event['selection']['rows']) > 0:
-        sel_variant_index_ = event['selection']['rows']
-    else:
-        sel_variant_index_ = 0
-
-    r_sel_ = df_.loc[sel_variant_index_].squeeze()
-    #st.write(r_sel_.variant_id)
-
-    uniprot_id, aa_pos, aa_ref, aa_alt = db.parse_varstr(r_sel_.variant_id)
-    #st.write(uniprot_id)
-    #st.write(aa_pos)
-    #st.write(aa_ref)
-    #st.write(aa_alt)
 
     col1, col2 = st.columns(2)
-
-
-    @st.cache_resource
-    def read_af2_v4(af2_id):
-        url_ = f'https://alphafold.ebi.ac.uk/files/AF-{af2_id}-F1-model_v4.pdb'
-        with urllib.request.urlopen(url_) as url:
-            return url.read().decode('utf-8')
-
     with col1:
+        event = st.dataframe(
+            df_,
+            column_order = ['variant_id', 'am_pathogenicity', 'am_class', 'pred_ddg', 'pocketscore', 'interface'],
+            #column_config=column_configuration,
+            use_container_width=True,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
+        )
+        #st.write(event)
+        if len(event['selection']['rows']) > 0:
+            sel_variant_index_ = event['selection']['rows']
+        else:
+            sel_variant_index_ = 0
+
+        r_sel_ = df_.loc[sel_variant_index_].squeeze()
+        #st.write(r_sel_.variant_id)
+
+        uniprot_id, aa_pos, aa_ref, aa_alt = db.parse_varstr(r_sel_.variant_id)
+        #st.write(uniprot_id)
+        #st.write(aa_pos)
+        #st.write(aa_ref)
+        #st.write(aa_alt)
+
+    with col2:
         st.write('### Structure with variant')
         #st.write(len(read_af2_v4(uniprot_id)))
         pdb_ = read_af2_v4(uniprot_id)
@@ -94,6 +94,5 @@ else:
         })
         stmol.showmol(xyzview, height=800, width=800)
 
-    with col2:
         st.write('### Variant details')
         st.dataframe(r_sel_, use_container_width=True, height=800)
