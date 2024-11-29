@@ -7,3 +7,5 @@ py3Dmol==2.0.0.post2
 ipyspeck==0.6.1
 ipywidgets==7.6.3
 ipython_genutils
+unipressed
+biopython
