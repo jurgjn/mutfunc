@@ -31,9 +31,14 @@ rs_variants = []    # List for rs IDs
 
 # Tab 1: Input Logic
 with tab1:
-    st.sidebar.header("Input Variants")
-    uploaded_file = st.sidebar.file_uploader("Upload a file containing genomic variants", type=["txt", "csv"])
-    manual_input = st.text_area("Enter genomic variants (one per line)")
+    st.write("### Input Variants")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        manual_input = st.text_area("Enter genomic variants (one per line)")
+
+    with col2:
+        uploaded_file = st.file_uploader("Upload a file containing genomic variants", type=["txt", "csv"])
 
     # Handle uploaded file
     if uploaded_file is not None:
@@ -45,7 +50,7 @@ with tab1:
             prot_variants.extend(prot)
             st.success("File processed successfully!")
         except Exception as e:
-            st.sidebar.error("Failed to read the uploaded file. Please ensure it contains variants in one column.")
+            st.error("Failed to read the uploaded file. Please ensure it contains variants in one column.")
 
     # Handle manual input
     if manual_input:
