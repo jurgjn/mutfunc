@@ -95,7 +95,7 @@ def translate_genomic_coords(input):
     prot_vars = [read_vep_result(result) for result in results]
 
     # create dict but only if values not none
-    return {input[i]:prot_vars[i] for i in range(len(input)) if prot_vars[i] is not None}
+    return {prot_vars[i]:input[i] for i in range(len(input)) if prot_vars[i] is not None}
 
 
 def query_prot_ids(ensemble_ids, input_ids):
