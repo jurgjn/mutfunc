@@ -2,6 +2,7 @@ import streamlit as st
 import py3Dmol, stmol
 import util.db_utils as db
 import urllib.request
+import pandas as pd
 
 st.set_page_config(
     page_title='Browse Results',
@@ -12,6 +13,7 @@ st.set_page_config(
 st.title("Mutfunc - Browse Results 🕵️‍♂️")
 
 prot_variants = st.session_state.get("prot_variants", {})
+lookup_df = st.session_state.get("lookup_df", pd.DataFrame())
 
 #st.write(prot_variants)
 
@@ -28,6 +30,8 @@ else:
     #st.write(prot_variants)
     df_ = db.query_missense(internal_ids)
     df_['input_variant'] = df_['variant_id'].apply(lambda x: prot_variants[x])
+    lookup_df["In database"] = lookup_df["Translated variant"].isin(df_['variant_id'])
+
     col1, col2 = st.columns(2)
     with col1:
         st.write('Select a row to display the variant in the structure ☑️')
@@ -53,6 +57,9 @@ else:
         #st.write(aa_pos)
         #st.write(aa_ref)
         #st.write(aa_alt)
+
+        st.write('#### Processing details')
+        st.dataframe(lookup_df, use_container_width=True)
 
     with col2:
         #st.write('### Structure with variant')
