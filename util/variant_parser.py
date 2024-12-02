@@ -40,6 +40,63 @@ def fetch_variant_info(variants):
 
     return response.json()
 
+# fetching variant info based on genomic location
+def fetch_variant_vep(chr, region, mutation, species="human"):
+    """
+    Fetch variant information from the Ensembl VEP Region endpoint.
+
+    Parameters:
+    - species: Species name (e.g., 'homo_sapiens').
+    - region: Genomic region in the format 'chr:start-end' (e.g., '1:1000-2000').
+    - allele: Allele change in the format 'reference/variant' (e.g., 'A/T').
+
+    Returns:
+    - JSON response from the API if successful, otherwise an error message.
+    """
+    server = "https://rest.ensembl.org"
+    endpoint = f"/vep/{species}/region/{chr}:{region}-{region}/{mutation}?content-type=application/json&uniprot=1"
+    headers = {"Content-Type": "application/json", "uniprot": "1"}
+
+    url = f"{server}{endpoint}"
+    
+    try:
+        response = requests.get(url, headers=headers)
+        
+        # Check if the request was successful
+        if response.status_code != 200:
+            return {"error": f"HTTP {response.status_code}: {response.text}"}
+
+        return response.json()
+    except requests.RequestException as e:
+        return {"error": f"Request failed: {e}"}
+    
+def read_vep_result(result):
+    # check if result is a list
+    try: 
+        result = result[0]
+    except:
+        return
+    # check if result is a dict
+    if type(result) != dict:
+        return
+    if result["most_severe_consequence"] != "missense_variant":
+        return
+    position = result["transcript_consequences"][0]["protein_start"]
+    prot_id = result["transcript_consequences"][0]["uniprot_isoform"][0].split("-")[0]
+    aa_from = result["transcript_consequences"][0]["amino_acids"][0]
+    aa_to = result["transcript_consequences"][0]["amino_acids"][-1]
+    # create string
+    return f"{prot_id}/{aa_from}{position}{aa_to}"
+
+def translate_genomic_coords(input):
+    var_coords = [e.split(" ") for e in input]
+    results = [fetch_variant_vep(var[0][3:], var[1], var[2][-1]) for var in var_coords]
+    #st.write(results)
+    prot_vars = [read_vep_result(result) for result in results]
+
+    # create dict but only if values not none
+    return {input[i]:prot_vars[i] for i in range(len(input)) if prot_vars[i] is not None}
+
 
 def query_prot_ids(ensemble_ids, input_ids):
     """
@@ -111,29 +168,51 @@ def process_variant_info(variant_info):
 
 def parse_variants(variant_lines):
     """
-    Parse a list of variant lines into structured lists for rs IDs and protein variants.
+    Parse a list of variant lines into structured lists for rs IDs, genomic positions, and protein variants.
 
     Parameters:
     - variant_lines: List of strings, each representing a variant.
 
     Returns:
-    - A tuple of two lists: rs_variants and prot_variants.
+    - A dictionary with lists of variants:
+        {
+            "rs_variants": [...],
+            "genomic_positions": [...],
+            "protein_variants": [...],
+            "error_ids": [...],
+        }
     """
     rs_variants = []
-    prot_variants = []
+    genomic_positions = []
+    protein_variants = []
+    error_ids = []
+
     for line in variant_lines:
         stripped_line = line.strip()
         if stripped_line:
-            # Check if it's an rs ID or a protein ID
             if stripped_line.startswith("rs"):
+                # rs variant
                 rs_variants.append(stripped_line)
-            else:
-                # Split the line into protein ID and mutation
+            elif stripped_line.startswith("chr"):
+                # Genomic position
                 parts = stripped_line.split()
-                if len(parts) == 2:
-                    protein_id, mutation = parts
-                    #prot_variants.append({"protein": protein_id, "mutation": mutation})
-                    prot_variants.append(f"{protein_id}/{mutation}")
+                if len(parts) == 3 and "/" in parts[2]:
+                    genomic_positions.append(stripped_line)
                 else:
-                    st.warning(f"Invalid format in line: {stripped_line}. Expected 'proteinID mutation'.")
-    return rs_variants, prot_variants
+                    error_ids.append(stripped_line)
+            else:
+                # Protein variation
+                parts = stripped_line.split(" ")
+                if len(parts) == 2 and parts[1][0].isalpha() and parts[1][-1].isalpha():
+                    protein_variants.append(f"{parts[0]}/{parts[1]}")
+                else:
+                    error_ids.append(stripped_line)
+        else:
+            error_ids.append(stripped_line)
+
+    return {
+        "rs_variants": rs_variants,
+        "genomic_positions": genomic_positions,
+        "protein_variants": protein_variants,
+        "error_ids": error_ids,
+    }
