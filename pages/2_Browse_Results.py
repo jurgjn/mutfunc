@@ -30,6 +30,7 @@ else:
     df_['input_variant'] = df_['variant_id'].apply(lambda x: prot_variants[x])
     col1, col2 = st.columns(2)
     with col1:
+        st.write('Select a row to display the variant in the structure ☑️')
         event = st.dataframe(
             df_,
             column_order = ['input_variant','variant_id', 'am_pathogenicity', 'am_class', 'pred_ddg', 'pocketscore', 'interface'],
@@ -39,7 +40,6 @@ else:
             on_select="rerun",
             selection_mode="single-row",
         )
-        #st.write(event)
         if len(event['selection']['rows']) > 0:
             sel_variant_index_ = event['selection']['rows']
         else:
@@ -76,12 +76,12 @@ else:
 
         xyzview.addStyle({'resi': aa_pos}, {'stick': {'colorscheme': 'purpleCarbon'}})
         xyzview.addLabel( #https://3dmol.org/doc/GLViewer.html#addLabel
-            f'{aa_ref}{aa_pos}',
+            f'{aa_ref}{aa_pos}{aa_alt}',
             { #https://3dmol.csb.pitt.edu/doc/LabelSpec.html
-                'fontColor': 'red' if r_sel_.am_class == 'pathogenic' else 'blue' if r_sel_.am_class == 'benign' else 'gray',
+                'fontColor': '#ba181b' if r_sel_.am_class == 'pathogenic' else '#0077b6' if r_sel_.am_class == 'benign' else 'gray',
                 'backgroundColor': 'lightgray',
                 #'fontOpacity': 0.5,
-                'backgroundOpacity': 0.8,
+                'backgroundOpacity': 0.7,
             },
             {'resi': aa_pos},
         )
