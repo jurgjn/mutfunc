@@ -62,9 +62,26 @@ else:
         st.write('#### Detailed variant parsing results')
         st.dataframe(lookup_df, use_container_width=True)
         # write to the sidebar
+        # Calculate metrics
         not_translated = lookup_df[lookup_df['Translated variant'].isna()]["Input variant"].nunique()
         found = lookup_df["In database"].sum()
-        st.sidebar.write("{found} out of {total} variants where succesfully translated and found in the database. See on the right for details.".format(found=found, total=lookup_df["Input variant"].nunique()))
+        total = lookup_df["Input variant"].nunique()
+        ratio = found / total
+
+        # Determine emoji based on the ratio
+        if ratio >= 1.0:
+            emoji = "🎉"  # Great success
+        elif 0.5 <= ratio:
+            emoji = "🧐"  # Okay success
+        else:
+            emoji = "😰"  # Poor success
+
+        # Display message with emoji
+        st.sidebar.write(
+            "{emoji} **{found} out of {total}** variants were successfully translated and found in the database. See on the right for details.".format(
+                emoji=emoji, found=found, total=total
+            )
+        )
 
     with col2:
         #st.write('### Structure with variant')
