@@ -2,6 +2,8 @@
 import streamlit as st
 import pandas as pd
 import util.variant_parser as vp
+from collections import defaultdict
+
 
 st.set_page_config(
     page_title='Input variants',
@@ -22,7 +24,7 @@ lookup_df = pd.DataFrame()
 
 
 with col1:
-    manual_input = st.text_area("Enter genomic variants (one per line)", value = "rs699\nP00533 R132C\nP09874 S568F\nP00451 G41C\nchr14 89993420 A/G")#, 'P09874/D678H', 'Q96NU1/R28Q', 'P00451/G41C', 'P01019/T259M'])")
+    manual_input = st.text_area("Enter genomic variants (one per line)", value = "rs699\nrs6265\nP00533 R132C\nP09874 S568F\nP00451 G41C\nchr14 89993420 A/G")#, 'P09874/D678H', 'Q96NU1/R28Q', 'P00451/G41C', 'P01019/T259M'])")
 
 with col2:
     uploaded_file = st.file_uploader("Upload a file containing genomic variants", type=["txt", "csv"])
@@ -84,7 +86,13 @@ if st.button("Analyze Variants"):
             except Exception as e:
                 st.error(f"An error occurred when fetching the genomic positions: {e}")
 
-        lookup_df["Translated variant"] = lookup_df["Input variant"].map({v:k for k,v in prot_variants.items()})
+        # Step 1: Create a dictionary with lists of all translations
+        translations_dict = defaultdict(list)
+        for translation, variant in prot_variants.items():
+            translations_dict[variant].append(translation)
+
+        lookup_df["Translated variant"] = lookup_df["Input variant"].map(translations_dict)
+        lookup_df =  lookup_df.explode("Translated variant", ignore_index=True)
         st.session_state["lookup_df"] = lookup_df
 
         if len(prot_variants) == 0:

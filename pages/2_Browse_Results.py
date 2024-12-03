@@ -28,6 +28,7 @@ if not prot_variants:
 else:
     internal_ids = list(prot_variants.keys())
     #st.write(prot_variants)
+    #st.write(internal_ids)
     df_ = db.query_missense(internal_ids)
     df_['input_variant'] = df_['variant_id'].apply(lambda x: prot_variants[x])
     lookup_df["In database"] = lookup_df["Translated variant"].isin(df_['variant_id'])
@@ -58,8 +59,12 @@ else:
         #st.write(aa_ref)
         #st.write(aa_alt)
 
-        st.write('#### Processing details')
+        st.write('#### Detailed variant parsing results')
         st.dataframe(lookup_df, use_container_width=True)
+        # write to the sidebar
+        not_translated = lookup_df[lookup_df['Translated variant'].isna()]["Input variant"].nunique()
+        found = lookup_df["In database"].sum()
+        st.sidebar.write("{found} out of {total} variants where succesfully translated and found in the database. See on the right for details.".format(found=found, total=lookup_df["Input variant"].nunique()))
 
     with col2:
         #st.write('### Structure with variant')
