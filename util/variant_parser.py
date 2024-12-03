@@ -112,8 +112,10 @@ def query_prot_ids(ensemble_ids, input_ids):
     ensemble_ids = [element.split(":") for element in ensemble_ids]
     variants = [e[1][2:] for e in ensemble_ids] # remove ".p"
     ensemble_ids = [e[0] for e in ensemble_ids]
+    #st.write(ensemble_ids)
 
     ensemble_to_input = dict(zip(ensemble_ids, input_ids))
+    ensemble_to_variant = dict(zip(ensemble_ids, variants))
 
     # Submit a mapping request to UniProt
     request = IdMappingClient.submit(source="Ensembl_Protein", dest="UniProtKB-Swiss-Prot", ids=set(ensemble_ids))
@@ -132,6 +134,7 @@ def query_prot_ids(ensemble_ids, input_ids):
             break
 
     # TODO: add try except and waiting logic if result takes time
+    #st.write(result)
 
     #mapping = {e["from"]: e["to"] for e in result}
 
@@ -139,8 +142,9 @@ def query_prot_ids(ensemble_ids, input_ids):
     uniprot_id_map = list(set({(e["from"], e["to"]) for e in result}))#set(mapping.values())
     input_ids_left = [ensemble_to_input[e[0]] for e in uniprot_id_map]
     uniprot_ids = [e[1] for e in uniprot_id_map]
-
-    internal_ids = [convert_to_internal_id(uniprot_id, variants[0]) for uniprot_id in uniprot_ids]
+    #st.write(variants)
+    filtered_variants = [ensemble_to_variant[e[0]] for e in uniprot_id_map]
+    internal_ids = [convert_to_internal_id(uniprot_id, variant) for uniprot_id,variant in zip(uniprot_ids,filtered_variants)]
 
     return dict(zip(internal_ids,input_ids_left)) # Return results if successful
 
