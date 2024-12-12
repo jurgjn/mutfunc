@@ -5,40 +5,40 @@ import urllib.request
 import pandas as pd
 
 st.set_page_config(
-    page_title='Browse Results',
-    page_icon='🕵️‍♂️',
+    page_title='Input variants',
+    page_icon='🔬',
     layout='wide',
+    initial_sidebar_state="collapsed",
 )
 
 st.title("Mutfunc - Browse Results 🕵️‍♂️")
-
-prot_variants = st.session_state.get("prot_variants", {})
+#prot_variants = st.session_state.get("prot_variants", {}) # Not needed?
 lookup_df = st.session_state.get("lookup_df", pd.DataFrame())
 
-#st.write(prot_variants)
-
-@st.cache_resource
+@st.cache_data
 def read_af2_v4(af2_id):
     url_ = f'https://alphafold.ebi.ac.uk/files/AF-{af2_id}-F1-model_v4.pdb'
     with urllib.request.urlopen(url_) as url:
         return url.read().decode('utf-8')
 
-if not prot_variants:
+@st.cache_resource
+def read_clinvar():
+    df_ = pd.read_csv('/data/clinvar_snv_vep.missense.tsv', sep='\t', dtype={'CHROM': str})
+    return df_
+
+if not(len(lookup_df.query('`Inferred type` != "error"')) > 0):
     st.info("No variants available for browsing. Please input variants first.")
 else:
-    internal_ids = list(prot_variants.keys())
-    #st.write(prot_variants)
-    #st.write(internal_ids)
-    df_ = db.query_missense(internal_ids)
-    df_['input_variant'] = df_['variant_id'].apply(lambda x: prot_variants[x])
-    lookup_df["In database"] = lookup_df["Translated variant"].isin(df_['variant_id'])
+    df_ = db.query_missense(lookup_df['Translated variant'])
+    df_ = lookup_df.merge(df_, left_on='Translated variant', right_on='variant_id')
+    #st.write(df_)
 
     col1, col2 = st.columns(2)
     with col1:
         st.write('Select a row to display the variant in the structure ☑️')
         event = st.dataframe(
             df_,
-            column_order = ['input_variant','variant_id', 'am_pathogenicity', 'am_class', 'pred_ddg', 'pocketscore', 'interface'],
+            column_order = ['Input variant','variant_id', 'am_pathogenicity', 'am_class', 'pred_ddg', 'pocketscore', 'interface'],
             #column_config=column_configuration,
             use_container_width=True,
             hide_index=True,
@@ -58,30 +58,6 @@ else:
         #st.write(aa_pos)
         #st.write(aa_ref)
         #st.write(aa_alt)
-
-        st.write('#### Detailed variant parsing results')
-        st.dataframe(lookup_df, use_container_width=True)
-        # write to the sidebar
-        # Calculate metrics
-        not_translated = lookup_df[lookup_df['Translated variant'].isna()]["Input variant"].nunique()
-        found = lookup_df["In database"].sum()
-        total = lookup_df["Input variant"].nunique()
-        ratio = found / total
-
-        # Determine emoji based on the ratio
-        if ratio >= 1.0:
-            emoji = "🎉"  # Great success
-        elif 0.5 <= ratio:
-            emoji = "🧐"  # Okay success
-        else:
-            emoji = "😰"  # Poor success
-
-        # Display message with emoji
-        st.sidebar.write(
-            "{emoji} **{found} out of {total}** variants were successfully translated and found in the database. See on the right for details.".format(
-                emoji=emoji, found=found, total=total
-            )
-        )
 
     with col2:
         #st.write('### Structure with variant')

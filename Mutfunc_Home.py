@@ -2,13 +2,14 @@
 import streamlit as st
 import pandas as pd
 import util.variant_parser as vp
+import os
 from collections import defaultdict
-
 
 st.set_page_config(
     page_title='Input variants',
     page_icon='🔬',
     layout='wide',
+    initial_sidebar_state="collapsed",
 )
 
 st.title("Mutfunc - Let's get funky with mutations 🧬")
@@ -100,8 +101,37 @@ if st.button("Analyze Variants"):
         else:
             st.success("All variants processed!")
             st.session_state["prot_variants"] = prot_variants
-            st.write(prot_variants)
-            #st.switch_page("pages/2_Browse_Results.py")
+            #st.write('prot_variants:')
+            #st.write(prot_variants)
+            #st.write('lookup_df:')
+            #st.write(lookup_df)
 
+            st.dataframe(lookup_df, use_container_width=True)
+            # write to the sidebar
+            # Calculate metrics
+            not_translated = lookup_df[lookup_df['Translated variant'].isna()]["Input variant"].nunique()
+            total = lookup_df["Input variant"].nunique()
+            found = total #lookup_df["In database"].sum()
+            ratio = found / total
+
+            # Determine emoji based on the ratio
+            if ratio >= 1.0:
+                emoji = "🎉"  # Great success
+            elif 0.5 <= ratio:
+                emoji = "🧐"  # Okay success
+            else:
+                emoji = "😰"  # Poor success
+
+            # Display message with emoji
+            st.write(
+                "{emoji} **{found} out of {total}** variants were successfully translated and found in the database.".format(
+                    emoji=emoji, found=found, total=total
+                )
+            )
+
+            page_ = 'pages/2_Browse_Results.py'
+            #if st.button('Browse Results'):
+            #    st.switch_page(page_)
+            st.page_link(page_, label='Browse Results', icon='➡️')
 
 #st.session_state["rs_variants"] = rs_variants
