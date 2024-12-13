@@ -1,18 +1,14 @@
 
 import streamlit as st
 import pandas as pd
+import util.db_utils as db
 import util.variant_parser as vp
 import os
 from collections import defaultdict
 
-st.set_page_config(
-    page_title='Input variants',
-    page_icon='🔬',
-    layout='wide',
-    #initial_sidebar_state="collapsed",
-)
+st.set_page_config(page_title='mutfunc - input variants', page_icon='🧬', layout='wide',)
 
-st.title("Mutfunc - Let's get funky with mutations 🧬")
+st.title("Mutfunc - precomputed mechanistic consequences of mutations")
 
 col1, col2 = st.columns(2)
 
@@ -22,7 +18,6 @@ genomic_positions = [] #st.session_state.get("genomic_positions", [])
 error_ids = [] #st.session_state.get("error_ids", [])
 
 lookup_df = pd.DataFrame()
-
 
 with col1:
     manual_input = st.text_area("Enter genomic variants (one per line)", value = "rs699\nrs6265\nP00533 R132C\nP09874 S568F\nP00451 G41C\nchr14 89993420 A/G")#, 'P09874/D678H', 'Q96NU1/R28Q', 'P00451/G41C', 'P01019/T259M'])")
@@ -45,24 +40,34 @@ if uploaded_file is not None:
     except Exception as e:
         st.error("Failed to read the uploaded file. Please ensure it contains variants in one column.")
 
-if manual_input:
-    parsed_variants = vp.parse_variants(manual_input.split("\n"))
-    rs = parsed_variants.get("rs_variants", [])
-    genomic = parsed_variants.get("genomic_positions", [])
-    prot = parsed_variants.get("protein_variants", [])
-    rs_variants.extend(rs)
-    genomic_positions.extend(genomic)
-    prot_variants.update({p:p for p in prot})
-    error_ids.extend(parsed_variants.get("error_ids", []))
-    st.success("Manual input processed successfully!") # TODO: only print this on input/change 
+if st.button("Parse variants"):
+    if manual_input:
+        parsed_variants = vp.parse_variants(manual_input.split("\n"))
+        rs = parsed_variants.get("rs_variants", [])
+        genomic = parsed_variants.get("genomic_positions", [])
+        prot = parsed_variants.get("protein_variants", [])
+        rs_variants.extend(rs)
+        genomic_positions.extend(genomic)
+        prot_variants.update({p:p for p in prot})
+        error_ids.extend(parsed_variants.get("error_ids", []))
+        st.success("Manual input processed successfully!") # TODO: only print this on input/change 
 
-lookup_df["Input variant"] = rs_variants + genomic_positions + list(prot_variants.keys()) + error_ids
-lookup_df["Inferred type"] = ["rsid"]*len(rs_variants) + ["genomic coord"]*len(genomic_positions) + ["protein var"]*len(prot_variants) + ["error"]*len(error_ids)
+    # Try to parse input as a single uniprot_id (and fetch all clinvar variants as input)
+    if len(manual_input.split("\n")) == 1 and len(prot_variants) == 0:
+        uniprot_id_ = manual_input.split()[0]
+        #st.write(len(db.read_clinvar()))
+        #st.write(uniprot_id_)
+        #st.write(db.read_clinvar().query('uniprot_id == @uniprot_id_'))
+        prot_variants_ = db.read_clinvar().query('uniprot_id == @uniprot_id_')['variant_id'].tolist()
+        prot_variants = { var_: var_ for var_ in prot_variants_ }
+        error_ids = []
 
-if st.button("Analyze Variants"):
     if not prot_variants and not rs_variants and not genomic_positions:
         st.warning("No valid variants provided. Please upload a file or enter variants manually.")
     else:
+        lookup_df["Input variant"] = rs_variants + genomic_positions + list(prot_variants.keys()) + error_ids
+        lookup_df["Inferred type"] = ["rsid"]*len(rs_variants) + ["genomic coord"]*len(genomic_positions) + ["protein var"]*len(prot_variants) + ["error"]*len(error_ids)
+
         # translate rs variants
         if rs_variants:
             try:
@@ -93,24 +98,24 @@ if st.button("Analyze Variants"):
             translations_dict[variant].append(translation)
 
         lookup_df["Translated variant"] = lookup_df["Input variant"].map(translations_dict)
-        lookup_df =  lookup_df.explode("Translated variant", ignore_index=True)
+        lookup_df = lookup_df.explode("Translated variant", ignore_index=True)
         st.session_state["lookup_df"] = lookup_df
+
+        in_mutfunc = set(db.query_missense(lookup_df['Translated variant'].dropna())['variant_id'])
+        lookup_df['isin_mutfunc'] = lookup_df['Translated variant'].map(lambda var: var in in_mutfunc)
 
         if len(prot_variants) == 0:
             st.warning("No valid variants provided. Please upload a file or enter variants manually.")
         else:
             st.success("All variants processed!")
             st.session_state["prot_variants"] = prot_variants
-            #st.write('prot_variants:')
-            #st.write(prot_variants)
-            #st.write('lookup_df:')
-            #st.write(lookup_df)
 
-            # write to the sidebar
+            # Show table with coordinate translation outcomes
+            st.dataframe(lookup_df, use_container_width=True)
+
             # Calculate metrics
-            not_translated = lookup_df[lookup_df['Translated variant'].isna()]["Input variant"].nunique()
+            found = lookup_df.query('isin_mutfunc')["Input variant"].nunique()
             total = lookup_df["Input variant"].nunique()
-            found = total #lookup_df["In database"].sum()
             ratio = found / total
 
             # Determine emoji based on the ratio
@@ -127,12 +132,9 @@ if st.button("Analyze Variants"):
                     emoji=emoji, found=found, total=total
                 )
             )
-            st.dataframe(lookup_df, use_container_width=True)
 
             # Button/link to browsing the results
             page_ = 'pages/2_Browse_Results.py'
             #if st.button('Browse Results'):
             #    st.switch_page(page_)
-            st.page_link(page_, label='Browse Results', icon='➡️')
-
-#st.session_state["rs_variants"] = rs_variants
+            st.page_link(page_, label='Browse results', icon='⏩')

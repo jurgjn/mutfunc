@@ -1,6 +1,12 @@
 import pandas as pd
 import sqlite3
 import numpy as np
+import streamlit as st
+
+@st.cache_resource
+def read_clinvar():
+    df_ = pd.read_csv('/data/clinvar_snv_vep.missense.tsv', sep='\t', dtype={'CHROM': str})
+    return df_
 
 def parse_variant_id(variant_id):
     # df_var[['uniprot_id', 'aa_pos', 'aa_ref', 'aa_alt']] = df_var.apply(lambda r: parse_varstr(r['protein_variant']), axis=1, result_type='expand')
@@ -20,7 +26,9 @@ def parse_varstr(s):
     return uniprot_id, aa_pos, aa_ref, aa_alt
 
 def query_missense(variants):
-    if len(variants) == 1:
+    if len(variants) == 0:
+        return pd.DataFrame()
+    elif len(variants) == 1:
         variants_tuple = f"('{variants[0]}')"  # Single element tuple as string
     else:
         variants_tuple = str(tuple(variants))  # Normal tuple for multiple elements

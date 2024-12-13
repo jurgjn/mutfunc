@@ -4,14 +4,13 @@ import util.db_utils as db
 import urllib.request
 import pandas as pd
 
-st.set_page_config(
-    page_title='Input variants',
-    page_icon='🔬',
-    layout='wide',
-    #initial_sidebar_state="collapsed",
-)
+st.set_page_config(page_title='mutfunc - browse results', page_icon='🧬', layout='wide',)
+
+page_ = '/app/Mutfunc_Home.py'
+st.page_link(page_, label='Input coordinates', icon='⏪')
 
 st.title("Mutfunc - Browse Results 🕵️‍♂️")
+
 #prot_variants = st.session_state.get("prot_variants", {}) # Not needed?
 lookup_df = st.session_state.get("lookup_df", pd.DataFrame())
 
@@ -20,11 +19,6 @@ def read_af2_v4(af2_id):
     url_ = f'https://alphafold.ebi.ac.uk/files/AF-{af2_id}-F1-model_v4.pdb'
     with urllib.request.urlopen(url_) as url:
         return url.read().decode('utf-8')
-
-@st.cache_resource
-def read_clinvar():
-    df_ = pd.read_csv('/data/clinvar_snv_vep.missense.tsv', sep='\t', dtype={'CHROM': str})
-    return df_
 
 if not(len(lookup_df.query('`Inferred type` != "error"')) > 0):
     st.info("No variants available for browsing. Please input variants first.")

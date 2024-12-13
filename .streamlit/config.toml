@@ -1,5 +1,11 @@
 # https://docs.streamlit.io/develop/api-reference/configuration/config.toml
 
+[browser]
+
+# Whether to send usage statistics to Streamlit.
+# Default: true
+gatherUsageStats = false
+
 [client]
 
 # Change the visibility of items in the toolbar, options menu,
