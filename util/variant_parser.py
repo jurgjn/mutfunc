@@ -9,6 +9,7 @@ from Bio.Data.IUPACData import protein_letters_3to1
 import time
 
 # Function to query the Ensembl REST API
+st.cache_data(persist='disk')
 def fetch_variant_info(variants):
     """
     Fetch variant information from the Ensembl Variant Recoder endpoint.
@@ -41,6 +42,7 @@ def fetch_variant_info(variants):
     return response.json()
 
 # fetching variant info based on genomic location
+st.cache_data(persist='disk')
 def fetch_variant_vep(chr, region, mutation, species="human"):
     """
     Fetch variant information from the Ensembl VEP Region endpoint.

@@ -9,7 +9,7 @@ st.set_page_config(
     page_title='Input variants',
     page_icon='🔬',
     layout='wide',
-    initial_sidebar_state="collapsed",
+    #initial_sidebar_state="collapsed",
 )
 
 st.title("Mutfunc - Let's get funky with mutations 🧬")
@@ -106,7 +106,6 @@ if st.button("Analyze Variants"):
             #st.write('lookup_df:')
             #st.write(lookup_df)
 
-            st.dataframe(lookup_df, use_container_width=True)
             # write to the sidebar
             # Calculate metrics
             not_translated = lookup_df[lookup_df['Translated variant'].isna()]["Input variant"].nunique()
@@ -128,7 +127,9 @@ if st.button("Analyze Variants"):
                     emoji=emoji, found=found, total=total
                 )
             )
+            st.dataframe(lookup_df, use_container_width=True)
 
+            # Button/link to browsing the results
             page_ = 'pages/2_Browse_Results.py'
             #if st.button('Browse Results'):
             #    st.switch_page(page_)
