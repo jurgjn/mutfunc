@@ -4,10 +4,10 @@ import util.db_utils as db
 import urllib.request
 import pandas as pd
 
-st.set_page_config(page_title='mutfunc - browse results', page_icon='🧬', layout='wide',)
+st.set_page_config(page_title='Mutfunc: Results', page_icon='🧬', layout='wide',)
 
 page_ = '/app/Mutfunc_Home.py'
-st.page_link(page_, label='Input coordinates', icon='⏪')
+st.page_link(page_, label='Input Coordinates', icon='⏪')
 
 st.title("Mutfunc - Browse Results 🕵️‍♂️")
 

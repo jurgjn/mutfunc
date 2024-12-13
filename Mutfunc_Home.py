@@ -6,7 +6,7 @@ import util.variant_parser as vp
 import os
 from collections import defaultdict
 
-st.set_page_config(page_title='mutfunc - input variants', page_icon='🧬', layout='wide',)
+st.set_page_config(page_title='Mutfunc: Input', page_icon='🧬', layout='wide',)
 
 st.title("Mutfunc - precomputed mechanistic consequences of mutations")
 
@@ -48,7 +48,7 @@ if uploaded_file is not None:
     except Exception as e:
         st.error("Failed to read the uploaded file. Please ensure it contains variants in one column.")
 
-if st.button("Parse variants"):
+if st.button("Parse Variants"):
     if manual_input:
         parsed_variants = vp.parse_variants(manual_input.split("\n"))
         rs = parsed_variants.get("rs_variants", [])
@@ -62,6 +62,10 @@ if st.button("Parse variants"):
 
     # Try to parse input as a single uniprot_id (and fetch all clinvar variants as input)
     if len(manual_input.split("\n")) == 1 and len(prot_variants) == 0:
+        if len(manual_input) == 0:
+            st.warning("Input looks empty. Please upload a file or enter variants manually.")
+            st.stop()
+
         uniprot_id_ = manual_input.split()[0]
         #st.write(len(db.read_clinvar()))
         #st.write(uniprot_id_)
@@ -145,4 +149,4 @@ if st.button("Parse variants"):
             page_ = 'pages/2_Browse_Results.py'
             #if st.button('Browse Results'):
             #    st.switch_page(page_)
-            st.page_link(page_, label='Browse results', icon='⏩')
+            st.page_link(page_, label='Browse Results', icon='⏩')
