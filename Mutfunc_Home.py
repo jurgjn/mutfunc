@@ -20,7 +20,15 @@ error_ids = [] #st.session_state.get("error_ids", [])
 lookup_df = pd.DataFrame()
 
 with col1:
-    manual_input = st.text_area("Enter genomic variants (one per line)", value = "rs699\nrs6265\nP00533 R132C\nP09874 S568F\nP00451 G41C\nchr14 89993420 A/G")#, 'P09874/D678H', 'Q96NU1/R28Q', 'P00451/G41C', 'P01019/T259M'])")
+    examples = {
+        '(User-defined)': '',
+        'Mixed genomic/proteomic variants': "rs699\nrs6265\nP00533 R132C\nP09874 S568F\nP00451 G41C\nchr14 89993420 A/G",# 'P09874/D678H', 'Q96NU1/R28Q', 'P00451/G41C', 'P01019/T259M']),
+        'SLC25A4/P12235 (Fig. 3e)': 'P12235',
+        'MAPK1/P28482 (Fig. 6c)': 'P28482',
+    }
+    examples_sel = st.selectbox(label='Choose example:', options=examples.keys())
+    value_ = examples[examples_sel]
+    manual_input = st.text_area(label='Enter variants (one per line):', value=value_)
 
 with col2:
     uploaded_file = st.file_uploader("Upload a file containing genomic variants", type=["txt", "csv"])
@@ -111,7 +119,7 @@ if st.button("Parse variants"):
             st.session_state["prot_variants"] = prot_variants
 
             # Show table with coordinate translation outcomes
-            st.dataframe(lookup_df, use_container_width=True)
+            st.dataframe(lookup_df, use_container_width=True, hide_index=True)
 
             # Calculate metrics
             found = lookup_df.query('isin_mutfunc')["Input variant"].nunique()
