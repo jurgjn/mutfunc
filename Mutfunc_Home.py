@@ -20,6 +20,7 @@ error_ids = [] #st.session_state.get("error_ids", [])
 lookup_df = pd.DataFrame()
 
 with col1:
+    st.write("Enter your variants of interest below or upload a file.  \n  We currently only support human variants. Please use rsids (e.g. rs699); protein variants (e.g. P00533 R132C); or genomic coordinates (e.g. chr14 89993420 A/G).")
     examples = {
         '(User-defined)': '',
         'Mixed genomic/proteomic variants': "rs699\nrs6265\nP00533 R132C\nP09874 S568F\nP00451 G41C\nchr14 89993420 A/G",# 'P09874/D678H', 'Q96NU1/R28Q', 'P00451/G41C', 'P01019/T259M']),
@@ -150,3 +151,6 @@ if st.button("Parse Variants"):
             #if st.button('Browse Results'):
             #    st.switch_page(page_)
             st.page_link(page_, label='Browse Results', icon='⏩')
+
+# Footer
+import util.footer

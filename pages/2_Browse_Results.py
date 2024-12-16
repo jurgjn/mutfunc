@@ -95,3 +95,6 @@ else:
         stmol.showmol(xyzview, width=800)
         st.write('### Variant details')
         st.dataframe(r_sel_, use_container_width=True, height=800)
+
+# footer 
+import util.footer
