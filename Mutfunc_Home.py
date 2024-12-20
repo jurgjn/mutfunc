@@ -5,6 +5,7 @@ import util.db_utils as db
 import util.variant_parser as vp
 import os
 from collections import defaultdict
+from util.footer import show_footer
 
 st.set_page_config(page_title='Mutfunc: Input', page_icon='🧬', layout='wide',)
 
@@ -152,5 +153,4 @@ if st.button("Parse Variants"):
             #    st.switch_page(page_)
             st.page_link(page_, label='Browse Results', icon='⏩')
 
-# Footer
-import util.footer
+show_footer()

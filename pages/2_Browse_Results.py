@@ -3,6 +3,7 @@ import py3Dmol, stmol
 import util.db_utils as db
 import urllib.request
 import pandas as pd
+from util.footer import show_footer
 
 st.set_page_config(page_title='Mutfunc: Results', page_icon='🧬', layout='wide',)
 
@@ -97,4 +98,4 @@ else:
         st.dataframe(r_sel_, use_container_width=True, height=800)
 
 # footer 
-import util.footer
+show_footer()
