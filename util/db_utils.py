@@ -43,3 +43,9 @@ def query_missense(variants):
         'interface_strict': -99,
         'freq': -99,
     }, np.nan)
+
+@st.cache_data
+def query_pockets(uniprot_id):
+    with sqlite3.connect('/data/pockets.sqlite') as db:
+        df_ = pd.read_sql_query(sql='SELECT * FROM pockets WHERE uniprot_id = ' + "'" + uniprot_id + "'", con=db)
+    return df_
