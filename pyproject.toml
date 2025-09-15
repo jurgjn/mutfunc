@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mutfunc"
+version = "25.09-dev"
+authors = [
+  { name="jurgjn", email="jurgjn@users.noreply.github.com" },
+]
+description = "TBD"
+readme = "README.md"
+requires-python = ">=3.9"
+# https://pypi.org/classifiers/
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+]
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+  "biopython",
+  "pandas",
+]
+
+[project.urls]
+Homepage = "https://github.com/jurgjn/mutfunc"
+Issues = "https://github.com/jurgjn/mutfunc/issues"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  ".gitignore"
+]
