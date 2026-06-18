@@ -11,14 +11,12 @@ from dash_molstar.utils import molstar_helper
 import dash_bootstrap_components as dbc
 
 dash.register_page(__name__, path="/variants", title="Home")
-
-df = pd.read_parquet('data/human-missense.parquet').head(100)#.sample(1000)
-print(len(df), 'number of rows')
+df = pd.read_parquet('data/human-missense.parquet').head(10)
 
 # Requires Dash 2.17.0 or later
 layout = dbc.Container([
     html.H1(children='Mutfunc - precomputed mechanistic consequences of mutations'),
-
+    html.Div(id="print-variant-list"),
     html.Div([
         # Left column
         html.Div([
@@ -26,7 +24,7 @@ layout = dbc.Container([
             dbc.Container([dag.AgGrid(
                 id="variants",
                 style={"height": '500px', "width": "100%"},
-                rowData=df.to_dict('records'),
+                rowData=[],#df.to_dict('records'),
                 columnDefs=[{"field": i} for i in df.columns],
                 columnSize="sizeToFit",
                 dashGridOptions={"rowSelection": {"mode": "singleRow"}},
@@ -44,6 +42,32 @@ layout = dbc.Container([
     ], style={"display": "flex", "gap": "10px"}),
 
 ], style={"padding": "20px"}, fluid=True)
+
+@callback(
+    Output("print-variant-list", "children"),
+    Input("variant-list", "data"),
+)
+def print_variant_list(data):
+    pprint(data)
+    #if not data:
+    #    return "No data yet — go to Page 1 first."
+    #return f"Hello, {data['name']}!"
+    return data
+
+@callback(
+    Output("variants",  "rowData"),
+    Input("variant-list", "data"),
+)
+def read_variants(variant_list):
+    """Propagate variant-list store data into the AgGrid on page load."""
+    if not variant_list:
+        return [], "No variants loaded."
+ 
+    df = pd.read_parquet(
+        'data/human-missense.parquet',
+        filters=[('variant_id', 'in', variant_list)],
+    )
+    return df.to_dict('records')
 
 def parse_varstr(s):
     # df_var[['uniprot_id', 'aa_pos', 'aa_ref', 'aa_alt']] = df_var.apply(lambda r: parse_varstr(r['protein_variant']), axis=1, result_type='expand')
