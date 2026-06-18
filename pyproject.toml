@@ -1,34 +1,20 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [project]
 name = "mutfunc"
-version = "25.09-dev"
-authors = [
-  { name="jurgjn", email="jurgjn@users.noreply.github.com" },
-]
-description = "TBD"
+version = "26-dev"
+description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.9"
-# https://pypi.org/classifiers/
-classifiers = [
-  "Development Status :: 3 - Alpha",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3",
-]
-license = "MIT"
-license-files = ["LICENSE"]
+requires-python = ">=3.13,<3.14"
 dependencies = [
-  "biopython",
-  "pandas",
-]
-
-[project.urls]
-Homepage = "https://github.com/jurgjn/mutfunc"
-Issues = "https://github.com/jurgjn/mutfunc/issues"
-
-[tool.hatch.build.targets.sdist]
-exclude = [
-  ".gitignore"
+    "biopython>=1.87",
+    "dash>=4.2.0",
+    "dash-ag-grid>=35.2.0",
+    "dash-bootstrap-components>=2.0.4",
+    "dash-bootstrap-templates>=2.1.0",
+    "dash-molstar>=1.3.2",
+    "gunicorn>=26.0.0",
+    "matplotlib>=3.11.0",
+    "pandas>=3.0.3",
+    "pyarrow>=24.0.0",
+    "seaborn>=0.13.2",
+    "unipressed>=1.4.0",
 ]

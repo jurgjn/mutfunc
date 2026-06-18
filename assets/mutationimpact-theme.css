@@ -1,0 +1,510 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200");
+
+/* ============================================================================
+   MutationImpact — dark theme for dash-bootstrap-components (Bootstrap 5.3)
+   ----------------------------------------------------------------------------
+   Usage:
+     app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+   and drop this file in your ./assets folder. Set data-bs-theme="dark" on the
+   <html> element (see README), though the theme also forces dark via :root.
+
+   Built from the MutationImpact static HTML mockups. All design tokens live in
+   the :root block below — retint the app by editing those variables only.
+   ========================================================================== */
+
+:root,
+[data-bs-theme="dark"] {
+  /* ---- Brand --------------------------------------------------------- */
+  --mi-primary:            #195de6;
+  --mi-primary-rgb:        25, 93, 230;
+  --mi-primary-hover:      #1751c7;   /* ~primary darkened (matches hover) */
+
+  /* ---- Surfaces (canvas -> elevated -> control) ---------------------- */
+  --mi-bg:                 #111722;   /* page / canvas                    */
+  --mi-bg-rgb:             17, 23, 34;
+  --mi-surface:            #1a2232;   /* cards, panels, table header, fields */
+  --mi-surface-2:          #243047;   /* secondary buttons, toggles, chips */
+  --mi-surface-hover:      #344465;   /* hover for surface-2 controls      */
+
+  /* ---- Borders ------------------------------------------------------- */
+  --mi-border:             #243047;   /* subtle dividers / section rules   */
+  --mi-border-strong:      #344465;   /* inputs, table rows, emphasis      */
+
+  /* ---- Text ---------------------------------------------------------- */
+  --mi-text:               #e7ecf5;   /* body                              */
+  --mi-text-strong:        #ffffff;   /* headings / emphasis               */
+  --mi-muted:              #93a5c8;   /* secondary / placeholders          */
+
+  /* ---- Semantic (mutation predictions) ------------------------------- */
+  --mi-danger:             #ef4444;   /* Deleterious        (red-500)      */
+  --mi-warning:            #f97316;   /* Likely Deleterious (orange-500)   */
+  --mi-success:            #22c55e;   /* Benign             (green-500)    */
+
+  /* ---- Structure accents (3D viewer legend) -------------------------- */
+  --mi-accent-mutation:    #d9006c;   /* selected mutation                 */
+  --mi-accent-pocket:      #00bcd4;   /* predicted pocket                  */
+  --mi-accent-interface:   #ffc107;   /* predicted interface               */
+
+  /* ---- Type & radius ------------------------------------------------- */
+  --mi-font:               "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mi-font-mono:          ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --mi-radius:             0.5rem;     /* lg — default for cards/buttons    */
+  --mi-radius-sm:          0.25rem;
+  --mi-radius-xl:          0.75rem;
+
+  color-scheme: dark;
+
+  /* ======================================================================
+     Map MutationImpact tokens onto Bootstrap 5.3 CSS variables.
+     ==================================================================== */
+  --bs-primary:            var(--mi-primary);
+  --bs-primary-rgb:        var(--mi-primary-rgb);
+  --bs-link-color:         #5b8def;
+  --bs-link-color-rgb:     91, 141, 239;
+  --bs-link-hover-color:   #8fb2f5;
+  --bs-link-hover-color-rgb: 143, 178, 245;
+
+  --bs-body-bg:            var(--mi-bg);
+  --bs-body-bg-rgb:        var(--mi-bg-rgb);
+  --bs-body-color:         var(--mi-text);
+  --bs-body-color-rgb:     231, 236, 245;
+  --bs-emphasis-color:     var(--mi-text-strong);
+  --bs-emphasis-color-rgb: 255, 255, 255;
+  --bs-heading-color:      var(--mi-text-strong);
+
+  --bs-secondary-color:    var(--mi-muted);
+  --bs-secondary-color-rgb: 147, 165, 200;
+  --bs-secondary-bg:       var(--mi-surface);
+  --bs-secondary-bg-rgb:   26, 34, 50;
+  --bs-tertiary-color:     rgba(147, 165, 200, 0.7);
+  --bs-tertiary-bg:        var(--mi-surface-2);
+  --bs-tertiary-bg-rgb:    36, 48, 71;
+
+  --bs-border-color:           var(--mi-border);
+  --bs-border-color-translucent: rgba(255, 255, 255, 0.08);
+
+  --bs-font-sans-serif:    var(--mi-font);
+  --bs-font-monospace:     var(--mi-font-mono);
+  --bs-body-font-family:   var(--mi-font);
+  --bs-body-font-weight:   400;
+  --bs-body-line-height:   1.5;
+
+  /* Radii — tuned to the mockups (everything uses the lg/0.5rem corner) */
+  --bs-border-radius:      var(--mi-radius);
+  --bs-border-radius-sm:   var(--mi-radius-sm);
+  --bs-border-radius-lg:   var(--mi-radius-xl);
+  --bs-border-radius-xl:   1rem;
+  --bs-border-radius-xxl:  2rem;
+  --bs-border-radius-pill: 9999px;
+
+  /* Semantic colors */
+  --bs-success:            var(--mi-success);
+  --bs-success-rgb:        34, 197, 94;
+  --bs-danger:             var(--mi-danger);
+  --bs-danger-rgb:         239, 68, 68;
+  --bs-warning:            var(--mi-warning);
+  --bs-warning-rgb:        249, 115, 22;
+  --bs-info:               var(--mi-accent-pocket);
+  --bs-info-rgb:           0, 188, 212;
+
+  /* Subtle bg / text-emphasis (powers .alert-*, .text-bg-*, badges) */
+  --bs-primary-bg-subtle:    rgba(var(--mi-primary-rgb), 0.16);
+  --bs-primary-border-subtle: rgba(var(--mi-primary-rgb), 0.4);
+  --bs-primary-text-emphasis: #7ea6f2;
+  --bs-success-bg-subtle:    rgba(34, 197, 94, 0.12);
+  --bs-success-border-subtle: rgba(34, 197, 94, 0.4);
+  --bs-success-text-emphasis: var(--mi-success);
+  --bs-danger-bg-subtle:     rgba(239, 68, 68, 0.12);
+  --bs-danger-border-subtle: rgba(239, 68, 68, 0.4);
+  --bs-danger-text-emphasis: var(--mi-danger);
+  --bs-warning-bg-subtle:    rgba(249, 115, 22, 0.12);
+  --bs-warning-border-subtle: rgba(249, 115, 22, 0.4);
+  --bs-warning-text-emphasis: var(--mi-warning);
+  --bs-info-bg-subtle:       rgba(0, 188, 212, 0.12);
+  --bs-info-border-subtle:   rgba(0, 188, 212, 0.4);
+  --bs-info-text-emphasis:   var(--mi-accent-pocket);
+
+  /* Focus ring — primary glow like the mockup inputs */
+  --bs-focus-ring-color:   rgba(var(--mi-primary-rgb), 0.4);
+  --bs-focus-ring-width:   0.2rem;
+
+  --bs-code-color:         #d39bf0;
+  --bs-highlight-bg:       rgba(255, 193, 7, 0.25);
+}
+
+/* ============================================================================
+   Base
+   ========================================================================== */
+body {
+  background-color: var(--mi-bg);
+  color: var(--mi-text);
+  font-family: var(--mi-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  color: var(--mi-text-strong);
+  font-family: var(--mi-font);
+  letter-spacing: -0.015em;
+}
+
+h1, .h1, .display-1, .display-2, .display-3, .display-4, .display-5, .display-6 {
+  font-weight: 700;
+  letter-spacing: -0.033em;
+}
+.fw-black { font-weight: 700 !important; }   /* Space Grotesk maxes at 700 */
+
+a { color: var(--bs-link-color); text-decoration: none; }
+a:hover { color: var(--bs-link-hover-color); }
+
+.text-muted, .text-secondary { color: var(--mi-muted) !important; }
+
+::selection { background: rgba(var(--mi-primary-rgb), 0.35); }
+
+/* ============================================================================
+   Buttons
+   ========================================================================== */
+.btn {
+  --bs-btn-font-weight: 700;
+  --bs-btn-border-radius: var(--mi-radius);
+  letter-spacing: 0.015em;
+  transition: background-color .15s ease, border-color .15s ease,
+              opacity .15s ease, box-shadow .15s ease;
+}
+
+.btn-primary {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--mi-primary);
+  --bs-btn-border-color: var(--mi-primary);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--mi-primary-hover);
+  --bs-btn-hover-border-color: var(--mi-primary-hover);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--mi-primary-hover);
+  --bs-btn-active-border-color: var(--mi-primary-hover);
+  --bs-btn-disabled-color: #cdd6e6;
+  --bs-btn-disabled-bg: #3a4a63;
+  --bs-btn-disabled-border-color: #3a4a63;
+}
+
+/* Secondary = the grey "Save Session" button from the mockup */
+.btn-secondary {
+  --bs-btn-color: var(--mi-text-strong);
+  --bs-btn-bg: var(--mi-surface-2);
+  --bs-btn-border-color: var(--mi-surface-2);
+  --bs-btn-hover-color: var(--mi-text-strong);
+  --bs-btn-hover-bg: var(--mi-surface-hover);
+  --bs-btn-hover-border-color: var(--mi-surface-hover);
+  --bs-btn-active-color: var(--mi-text-strong);
+  --bs-btn-active-bg: var(--mi-surface-hover);
+  --bs-btn-active-border-color: var(--mi-surface-hover);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: #7ea6f2;
+  --bs-btn-border-color: rgba(var(--mi-primary-rgb), 0.6);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--mi-primary);
+  --bs-btn-hover-border-color: var(--mi-primary);
+  --bs-btn-active-bg: var(--mi-primary);
+  --bs-btn-active-border-color: var(--mi-primary);
+}
+
+.btn-link { --bs-btn-color: var(--bs-link-color); --bs-btn-font-weight: 600; text-decoration: none; }
+
+/* ============================================================================
+   Cards / panels
+   ========================================================================== */
+.card {
+  --bs-card-bg: var(--mi-surface);
+  --bs-card-color: var(--mi-text);
+  --bs-card-border-color: var(--mi-border);
+  --bs-card-border-radius: var(--mi-radius);
+  --bs-card-inner-border-radius: calc(var(--mi-radius) - 1px);
+  --bs-card-cap-bg: transparent;
+  --bs-card-cap-color: var(--mi-text-strong);
+  --bs-card-title-color: var(--mi-text-strong);
+  --bs-card-subtitle-color: var(--mi-muted);
+  /* set explicitly too — some Bootstrap builds default --bs-card-bg to
+     transparent, so we don't rely on the variable alone */
+  background-color: var(--mi-surface);
+  color: var(--mi-text);
+  border-color: var(--mi-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+.card-title { color: var(--mi-text-strong); }
+.card-header, .card-footer { border-color: var(--mi-border); }
+
+/* ============================================================================
+   Tables — matches the results grid (header surface, row dividers, hover,
+   and a primary-tinted selected row).
+   ========================================================================== */
+.table {
+  --bs-table-color: var(--mi-text);
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--mi-border-strong);
+  --bs-table-striped-color: var(--mi-text);
+  --bs-table-striped-bg: rgba(255, 255, 255, 0.03);
+  --bs-table-hover-color: var(--mi-text-strong);
+  --bs-table-hover-bg: rgba(255, 255, 255, 0.04);
+  --bs-table-active-color: var(--mi-text-strong);
+  --bs-table-active-bg: rgba(var(--mi-primary-rgb), 0.16);
+  vertical-align: middle;
+}
+.table > thead {
+  background-color: var(--mi-surface);
+  color: var(--mi-text-strong);
+}
+.table > thead th {
+  font-weight: 500;
+  color: var(--mi-text-strong);
+  border-bottom-color: var(--mi-border-strong);
+  white-space: nowrap;
+}
+.table > tbody td { color: var(--mi-muted); }
+.table > tbody td:first-child { color: var(--mi-text); font-weight: 500; }
+
+/* Wrap a table in .mi-table-card for the bordered, rounded container look */
+.mi-table-card {
+  border: 1px solid var(--mi-border-strong);
+  border-radius: var(--mi-radius);
+  overflow: hidden;
+}
+.mi-table-card .table { margin-bottom: 0; }
+
+/* ============================================================================
+   Forms
+   ========================================================================== */
+.form-control,
+.form-select,
+textarea.form-control {
+  background-color: var(--mi-surface);
+  border: 1px solid var(--mi-border-strong);
+  color: var(--mi-text-strong);
+  border-radius: var(--mi-radius);
+}
+.form-control:focus,
+.form-select:focus {
+  background-color: var(--mi-surface);
+  border-color: var(--mi-primary);
+  color: var(--mi-text-strong);
+  box-shadow: 0 0 0 0.2rem rgba(var(--mi-primary-rgb), 0.35);
+}
+.form-control::placeholder { color: var(--mi-muted); opacity: 1; }
+.form-control:disabled { background-color: rgba(26, 34, 50, 0.6); color: var(--mi-muted); }
+
+.form-label { color: var(--mi-text-strong); font-weight: 500; margin-bottom: 0.5rem; }
+.form-text { color: var(--mi-muted); }
+
+.input-group-text {
+  background-color: var(--mi-surface-2);
+  border: 1px solid var(--mi-border-strong);
+  color: var(--mi-muted);
+}
+
+.form-check-input {
+  background-color: var(--mi-surface-2);
+  border: 1px solid var(--mi-border-strong);
+}
+.form-check-input:checked {
+  background-color: var(--mi-primary);
+  border-color: var(--mi-primary);
+}
+.form-check-input:focus {
+  border-color: var(--mi-primary);
+  box-shadow: 0 0 0 0.2rem rgba(var(--mi-primary-rgb), 0.35);
+}
+.form-check-label { color: var(--mi-text); }
+
+.form-switch .form-check-input:checked { background-color: var(--mi-primary); }
+.form-range::-webkit-slider-thumb { background-color: var(--mi-primary); }
+.form-range::-moz-range-thumb { background-color: var(--mi-primary); }
+
+/* ============================================================================
+   Navbar / nav
+   ========================================================================== */
+.navbar {
+  --bs-navbar-color: var(--mi-muted);
+  --bs-navbar-hover-color: var(--mi-text-strong);
+  --bs-navbar-active-color: var(--mi-text-strong);
+  --bs-navbar-brand-color: var(--mi-text-strong);
+  --bs-navbar-brand-hover-color: var(--mi-text-strong);
+  background-color: var(--mi-bg);
+  border-bottom: 1px solid var(--mi-border);
+}
+.navbar-brand { font-weight: 700; letter-spacing: -0.015em; }
+.nav-link {
+  --bs-nav-link-color: var(--mi-muted);
+  --bs-nav-link-hover-color: var(--mi-primary);
+  font-weight: 500;
+  transition: color .15s ease;
+}
+
+.nav-tabs {
+  --bs-nav-tabs-border-color: var(--mi-border);
+  --bs-nav-tabs-link-active-color: var(--mi-text-strong);
+  --bs-nav-tabs-link-active-bg: var(--mi-surface);
+  --bs-nav-tabs-link-active-border-color: var(--mi-border-strong) var(--mi-border-strong) var(--mi-surface);
+  --bs-nav-tabs-link-hover-border-color: var(--mi-border-strong);
+}
+.nav-pills {
+  --bs-nav-pills-link-active-color: #fff;
+  --bs-nav-pills-link-active-bg: var(--mi-primary);
+}
+
+/* ============================================================================
+   Badges — the prediction pills (Deleterious / Likely / Benign)
+   ========================================================================== */
+.badge { font-weight: 500; letter-spacing: 0; }
+
+.mi-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem;
+  padding: 0 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+}
+.mi-badge-deleterious { background-color: rgba(239, 68, 68, 0.10); color: var(--mi-danger); }
+.mi-badge-likely      { background-color: rgba(249, 115, 22, 0.10); color: var(--mi-warning); }
+.mi-badge-benign      { background-color: rgba(34, 197, 94, 0.10); color: var(--mi-success); }
+.mi-badge-neutral     { background-color: rgba(147, 165, 200, 0.12); color: var(--mi-muted); }
+
+/* ============================================================================
+   Segmented control (Bulk Input / Single Entry toggle)
+   Apply .mi-segment to a container of .btn-check + label.btn, or use the
+   helper markup shown in the demo app.
+   ========================================================================== */
+.mi-segment {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background-color: var(--mi-surface-2);
+  border-radius: var(--mi-radius);
+}
+.mi-segment .btn {
+  --bs-btn-color: var(--mi-muted);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: transparent;
+  --bs-btn-font-weight: 500;
+  --bs-btn-active-color: var(--mi-text-strong);
+  --bs-btn-active-bg: var(--mi-bg);
+  --bs-btn-active-border-color: transparent;
+  box-shadow: none;
+}
+.mi-segment .btn-check:checked + .btn,
+.mi-segment .btn.active {
+  color: var(--mi-text-strong);
+  background-color: var(--mi-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================================
+   Dropdowns / modals / list-group / alerts — kept on-theme for completeness
+   ========================================================================== */
+.dropdown-menu {
+  --bs-dropdown-bg: var(--mi-surface);
+  --bs-dropdown-color: var(--mi-text);
+  --bs-dropdown-border-color: var(--mi-border-strong);
+  --bs-dropdown-link-color: var(--mi-text);
+  --bs-dropdown-link-hover-color: var(--mi-text-strong);
+  --bs-dropdown-link-hover-bg: var(--mi-surface-2);
+  --bs-dropdown-link-active-color: #fff;
+  --bs-dropdown-link-active-bg: var(--mi-primary);
+  --bs-dropdown-border-radius: var(--mi-radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.modal-content, .offcanvas {
+  background-color: var(--mi-surface);
+  color: var(--mi-text);
+  border: 1px solid var(--mi-border-strong);
+  border-radius: var(--mi-radius-xl);
+}
+.modal-header, .modal-footer { border-color: var(--mi-border); }
+
+.list-group {
+  --bs-list-group-bg: var(--mi-surface);
+  --bs-list-group-color: var(--mi-text);
+  --bs-list-group-border-color: var(--mi-border);
+  --bs-list-group-action-hover-bg: var(--mi-surface-2);
+  --bs-list-group-action-color: var(--mi-text);
+  --bs-list-group-active-bg: var(--mi-primary);
+  --bs-list-group-active-border-color: var(--mi-primary);
+}
+
+.alert-danger  { --bs-alert-color: #fca5a5; --bs-alert-bg: rgba(239,68,68,.12);  --bs-alert-border-color: rgba(239,68,68,.4); }
+.alert-warning { --bs-alert-color: #fdba74; --bs-alert-bg: rgba(249,115,22,.12); --bs-alert-border-color: rgba(249,115,22,.4); }
+.alert-success { --bs-alert-color: #86efac; --bs-alert-bg: rgba(34,197,94,.12);  --bs-alert-border-color: rgba(34,197,94,.4); }
+.alert-info    { --bs-alert-color: #67e8f9; --bs-alert-bg: rgba(0,188,212,.12);  --bs-alert-border-color: rgba(0,188,212,.4); }
+
+.accordion {
+  --bs-accordion-bg: var(--mi-surface);
+  --bs-accordion-color: var(--mi-text);
+  --bs-accordion-border-color: var(--mi-border-strong);
+  --bs-accordion-btn-color: var(--mi-text-strong);
+  --bs-accordion-btn-bg: var(--mi-surface);
+  --bs-accordion-active-color: var(--mi-text-strong);
+  --bs-accordion-active-bg: var(--mi-surface-2);
+  --bs-accordion-btn-focus-border-color: var(--mi-primary);
+  --bs-accordion-btn-focus-box-shadow: 0 0 0 0.2rem rgba(var(--mi-primary-rgb), 0.35);
+  --bs-accordion-border-radius: var(--mi-radius);
+}
+
+/* ============================================================================
+   Utilities
+   ========================================================================== */
+.bg-surface   { background-color: var(--mi-surface) !important; }
+.bg-surface-2 { background-color: var(--mi-surface-2) !important; }
+.bg-canvas    { background-color: var(--mi-bg) !important; }
+.border-subtle { border-color: var(--mi-border) !important; }
+.border-strong { border-color: var(--mi-border-strong) !important; }
+.text-strong  { color: var(--mi-text-strong) !important; }
+.text-mi-muted { color: var(--mi-muted) !important; }
+
+.text-accent-mutation  { color: var(--mi-accent-mutation) !important; }
+.text-accent-pocket    { color: var(--mi-accent-pocket) !important; }
+.text-accent-interface { color: var(--mi-accent-interface) !important; }
+.bg-accent-mutation  { background-color: var(--mi-accent-mutation) !important; }
+.bg-accent-pocket    { background-color: var(--mi-accent-pocket) !important; }
+.bg-accent-interface { background-color: var(--mi-accent-interface) !important; }
+
+.font-mono { font-family: var(--mi-font-mono) !important; }
+
+/* Material Symbols icon helper (same config as the mockups) */
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  vertical-align: middle;
+}
+
+/* Custom scrollbar to match the dark surfaces */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mi-surface-hover) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background-color: var(--mi-surface-hover);
+  border-radius: 9999px;
+  border: 2px solid var(--mi-bg);
+}
+*::-webkit-scrollbar-thumb:hover { background-color: #41557d; }

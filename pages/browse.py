@@ -1,3 +1,83 @@
+from pprint import pprint
+import dash
+import pandas as pd
+
+from dash import Dash, html, Input, Output, callback
+import dash_ag_grid as dag
+
+import dash_molstar
+from dash_molstar.utils import molstar_helper
+
+import dash_bootstrap_components as dbc
+
+dash.register_page(__name__, path="/variants", title="Home")
+
+df = pd.read_parquet('data/human-missense.parquet').head(100)#.sample(1000)
+print(len(df), 'number of rows')
+
+# Requires Dash 2.17.0 or later
+layout = dbc.Container([
+    html.H1(children='Mutfunc - precomputed mechanistic consequences of mutations'),
+
+    html.Div([
+        # Left column
+        html.Div([
+            html.H2("Variants"),
+            dbc.Container([dag.AgGrid(
+                id="variants",
+                style={"height": '500px', "width": "100%"},
+                rowData=df.to_dict('records'),
+                columnDefs=[{"field": i} for i in df.columns],
+                columnSize="sizeToFit",
+                dashGridOptions={"rowSelection": {"mode": "singleRow"}},
+            )], fluid=True, className="dbc dbc-ag-grid"),
+        ], style={"flex": "1"}),#, "backgroundColor": "var(--bs-link-color)"}),#, "padding": "20px"}),#, "background": "#f0f0f0"}),
+
+        # Right column
+        html.Div([
+            html.H2("Structure"),
+            dash_molstar.MolstarViewer(
+                id='viewer', style={'width': 'auto', 'height':'500px'}
+            ),
+        ], style={"flex": "1"}),#, "padding": "20px"}),#, "background": "#dce8f7"}),
+
+    ], style={"display": "flex", "gap": "10px"}),
+
+], style={"padding": "20px"}, fluid=True)
+
+def parse_varstr(s):
+    # df_var[['uniprot_id', 'aa_pos', 'aa_ref', 'aa_alt']] = df_var.apply(lambda r: parse_varstr(r['protein_variant']), axis=1, result_type='expand')
+    uniprot_id, variant_id = s.split('/')
+    aa_pos = int(variant_id[1:-1])
+    aa_ref = variant_id[0]
+    aa_alt = variant_id[-1]
+    #print(uniprot_id, aa_pos, aa_ref, aa_alt)
+    return uniprot_id, aa_pos, aa_ref, aa_alt
+
+@callback(
+    Output('viewer', 'data'),
+    Input("variants", "selectedRows"),
+    prevent_initial_call=True,
+)
+def show_structure(selected_row):
+    pprint(selected_row)
+    uniprot_id, pos, ref, alt = parse_varstr(selected_row[0]['variant_id'])
+    pprint(uniprot_id)
+
+    data = molstar_helper.parse_url(f'https://alphafold.ebi.ac.uk/files/AF-{uniprot_id}-F1-model_v6.pdb')
+    return data
+
+#@app.callback(Output('viewer', 'data'),
+#              Input('load_protein', 'n_clicks'),
+#              prevent_initial_call=True)
+#def display_output(yes):
+#    data = molstar_helper.parse_url('https://files.rcsb.org/download/3U7Y.cif')
+#    return data
+
+#if __name__ == '__main__':
+#    app.run(debug=True)
+
+'''
 import streamlit as st
 import py3Dmol, stmol
 import util.db_utils as db
@@ -119,3 +199,4 @@ else:
 
 # footer 
 show_footer()
+'''

@@ -1,5 +1,3 @@
-
-import streamlit as st
 import pandas as pd
 import util.db_utils as db
 import util.variant_parser as vp
@@ -7,6 +5,84 @@ import os
 from collections import defaultdict
 from util.footer import show_footer
 
+import dash
+
+from pprint import pprint
+
+import pandas as pd
+
+from dash import Dash, html, Input, Output, dcc, callback
+import dash_ag_grid as dag
+
+import dash_molstar
+from dash_molstar.utils import molstar_helper
+
+import dash_bootstrap_components as dbc
+
+dash.register_page(__name__, path="/", title="Input Variants")
+
+examples = {
+    '(User-defined)': '',
+    'Mixed genomic/proteomic variants': "rs699\nrs6265\nP00533 R132C\nP09874 S568F\nP00451 G41C\nchr14 89993420 A/G",
+    'SLC25A4/P12235 (Fig. 3e)': 'P12235',
+    'MAPK1/P28482 (Fig. 6c)': 'P28482',
+}
+
+layout = dbc.Container([
+    dbc.Row([
+
+        # Left column
+        dbc.Col([
+            html.P("Enter your variants of interest below or upload a file. "
+                   "We currently only support human variants. Please use rsids (e.g. rs699); "
+                   "protein variants (e.g. P00533 R132C); or genomic coordinates (e.g. chr14 89993420 A/G)."),
+            dbc.Label("Choose example:"),
+            dbc.Select(
+                id="example-select",
+                options=[{"label": k, "value": k} for k in examples],
+                value='(User-defined)',
+            ),
+            dbc.Label("Enter variants (one per line):", class_name="mt-2"),
+            dbc.Textarea(
+                id="variant-input",
+                value='',
+                style={"height": "200px"},
+            ),
+        ], width=6),
+
+        # Right column
+        dbc.Col([
+            dbc.Label("Upload a file containing genomic variants"),
+            dcc.Upload(
+                id="upload-variants",
+                children=html.Div([
+                    "Drag and drop or ",
+                    html.A("select a file"),
+                ]),
+                style={
+                    "height": "60px",
+                    "lineHeight": "60px",
+                    "borderWidth": "1px",
+                    "borderStyle": "dashed",
+                    "borderRadius": "5px",
+                    "textAlign": "center",
+                },
+                accept=".txt,.csv",
+            ),
+        ], width=6),
+
+    ])
+], fluid=True)
+
+@callback(
+    Output("variant-input", "value"),
+    Input("example-select", "value"),
+    prevent_initial_call=True,
+)
+def update_textarea(selected):
+    return examples.get(selected, '')
+
+'''
 st.set_page_config(page_title='Mutfunc: Input', page_icon='🧬', layout='wide',)
 
 st.title("Mutfunc - precomputed mechanistic consequences of mutations")
@@ -154,3 +230,4 @@ if st.button("Parse Variants"):
             st.page_link(page_, label='Browse Results', icon='⏩')
 
 show_footer()
+'''

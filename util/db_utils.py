@@ -1,9 +1,9 @@
 import pandas as pd
 import sqlite3
 import numpy as np
-import streamlit as st
+#import streamlit as st
 
-@st.cache_resource
+#@st.cache_resource
 def read_clinvar():
     df_ = pd.read_csv('/data/clinvar_snv_vep.missense.tsv', sep='\t', dtype={'CHROM': str})
     return df_
@@ -44,7 +44,7 @@ def query_missense(variants):
         'freq': -99,
     }, np.nan)
 
-@st.cache_data
+#@st.cache_data
 def query_pockets(uniprot_id):
     with sqlite3.connect('/data/pockets.sqlite') as db:
         df_ = pd.read_sql_query(sql='SELECT * FROM pockets WHERE uniprot_id = ' + "'" + uniprot_id + "'", con=db)
