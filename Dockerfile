@@ -1,23 +1,39 @@
-# Adapted from https://docs.streamlit.io/deploy/tutorials/docker
+# Based on: https://docs.streamlit.io/deploy/tutorials/docker
+# Updated to python 3.13 & removed software-properties-common as deprecated
 
-FROM nikolaik/python-nodejs:latest
+FROM python:3.13-slim
 
-WORKDIR /app
+# python3-pymol via apt-get as pip package missing for linux/arm64
+# libboost-all-dev required by CombFold
+RUN DEBIAN_FRONTEND=noninteractive \
+apt-get update --quiet \
+&& apt-get install --yes --quiet build-essential curl git python3-pymol libboost-all-dev \
+&& rm -rf /var/lib/apt/lists/*
 
-#RUN apt-get update && apt-get install -y \
-#    build-essential \
-#    curl \
-#    software-properties-common \
-#    git \
-#    && rm -rf /var/lib/apt/lists/*
-#
-# Copy files from current directory instead of repo checkout
-#COPY . .
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-RUN pip3 install -r requirements.txt
+# Suppress `warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.`
+ENV UV_LINK_MODE=copy
 
-EXPOSE 8501
+# https://docs.astral.sh/uv/guides/integration/docker/#installing-a-package
+ENV UV_SYSTEM_PYTHON=1
 
-HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
+# https://docs.astral.sh/uv/guides/integration/docker/#compiling-bytecode
+ENV UV_COMPILE_BYTECODE=1
 
-ENTRYPOINT ["streamlit", "run", "Mutfunc_Home.py", "--server.port=8501", "--server.address=0.0.0.0"]
+WORKDIR /app/mutfunc
+COPY data/* data/
+
+COPY pyproject.toml .
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync
+
+COPY *.py .
+COPY assets/* assets/
+COPY pages/* pages/
+COPY util/* util/
+
+EXPOSE 8050
+
+ENTRYPOINT ["uv", "run", "gunicorn", "app:server", "--bind", "0.0.0.0:8050"]

@@ -1,7 +1,7 @@
 from pprint import pprint
 import dash
 import pandas as pd
-
+import pyarrow.parquet as pq
 from dash import Dash, html, Input, Output, callback
 import dash_ag_grid as dag
 
@@ -11,7 +11,7 @@ from dash_molstar.utils import molstar_helper
 import dash_bootstrap_components as dbc
 
 dash.register_page(__name__, path="/variants", title="Home")
-df = pd.read_parquet('data/human-missense.parquet').head(10)
+#df = pd.read_parquet('data/human-missense.parquet').head(10)
 
 # Requires Dash 2.17.0 or later
 layout = dbc.Container([
@@ -25,7 +25,7 @@ layout = dbc.Container([
                 id="variants",
                 style={"height": '500px', "width": "100%"},
                 rowData=[],#df.to_dict('records'),
-                columnDefs=[{"field": i} for i in df.columns],
+                columnDefs=[{"field": i} for i in pq.read_schema('data/human-missense.parquet').names],
                 columnSize="sizeToFit",
                 dashGridOptions={"rowSelection": {"mode": "singleRow"}},
             )], fluid=True, className="dbc dbc-ag-grid"),

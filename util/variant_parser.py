@@ -5,7 +5,7 @@ import numpy as np, matplotlib, matplotlib.colors, matplotlib.pyplot as plt, sea
 import pandas as pd
 import requests
 from unipressed import IdMappingClient
-from Bio.Data.IUPACData import protein_letters_3to1
+#from Bio.Data.IUPACData import protein_letters_3to1
 import time
 
 # Function to query the Ensembl REST API
