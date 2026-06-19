@@ -31,11 +31,39 @@ P12235/I164V
 P12235/S167T
 P12235/V278M"""
 
+fig6c_ = """Q14500/R66H
+Q14500/R81W
+Q14500/E139K
+Q14500/T142N
+Q14500/G145S
+Q14500/R149H
+Q14500/D173N
+Q14500/A185V
+Q14500/Q192H
+Q14500/R219C
+Q14500/R229H
+Q14500/R229C
+Q14500/D256N
+Q14500/R261H
+Q14500/M302I
+Q14500/E378K
+Q14500/E380K
+"""
+
+fig6d_ = """Q8IUR5/G35R
+Q8IUR5/D62N
+Q8IUR5/W79L
+Q8IUR5/K81Q
+Q8IUR5/A409V
+"""
+
 examples = {
     '(User-defined)': '',
-    'Mixed genomic/proteomic variants': "rs699\nrs6265\nP00533 R132C\nP09874 S568F\nP00451 G41C\nchr14 89993420 A/G",
-    'SLC25A4/P12235 (Fig. 3e)': fig3e_,
-    'MAPK1/P28482 (Fig. 6c)': 'P28482',
+    #'Mixed genomic/proteomic variants': "rs699\nrs6265\nP00533 R132C\nP09874 S568F\nP00451 G41C\nchr14 89993420 A/G",
+    'SLC25A4/P12235 ClinVar (Fig. 3e)': fig3e_,
+    'KCNJ12/Q14500 COSMIC (Fig. 6c)': fig6c_,
+    'TMTC1/Q8IUR5 COSMIC (Fig. 6d)': fig6d_,
+    #'MAPK1/P28482 (Fig. 5c)': 'P28482',
 }
 
 layout = dbc.Container([
@@ -61,27 +89,28 @@ layout = dbc.Container([
             ),
         ], width=6),
 
+        
         # Right column
-        dbc.Col([
-            dbc.Label("Upload a file containing genomic variants"),
-            dcc.Upload(
-                id="upload-variants",
-                children=html.Div([
-                    "Drag and drop or ",
-                    html.A("select a file"),
-                ]),
-                style={
-                    "height": "60px",
-                    "lineHeight": "60px",
-                    "borderWidth": "1px",
-                    "borderStyle": "dashed",
-                    "borderRadius": "5px",
-                    "textAlign": "center",
-                },
-                accept=".txt,.csv",
-            ),
-        ], width=6),
-
+        #dbc.Col([
+        #    dbc.Label("Upload a file containing genomic variants"),
+        #    dcc.Upload(
+        #        id="upload-variants",
+        #        children=html.Div([
+        #            "Drag and drop or ",
+        #            html.A("select a file"),
+        #        ]),
+        #        style={
+        #            "height": "60px",
+        #            "lineHeight": "60px",
+        #            "borderWidth": "1px",
+        #            "borderStyle": "dashed",
+        #            "borderRadius": "5px",
+        #            "textAlign": "center",
+        #        },
+        #        accept=".txt,.csv",
+        #    ),
+        #], width=6),
+        
     ]),
     #dcc.Link("Parse variants", href="/variants")
     html.Button("Parse Variants", id="go-btn"),
