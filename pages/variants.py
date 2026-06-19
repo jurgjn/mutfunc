@@ -1,61 +1,97 @@
 from pprint import pprint
 import dash
+from dash.exceptions import PreventUpdate
+
 import pandas as pd
 import pyarrow.parquet as pq
 from dash import Dash, html, Input, Output, callback
 import dash_ag_grid as dag
 
 import dash_molstar
-from dash_molstar.utils import molstar_helper
 
 import dash_bootstrap_components as dbc
 
-dash.register_page(__name__, path="/variants", title="Home")
+from dash_molstar.utils import molstar_helper
+from dash_molstar.utils.representations import Representation
+
+dash.register_page(__name__, path="/variants", title="Browse variants")
 #df = pd.read_parquet('data/human-missense.parquet').head(10)
 
 # Requires Dash 2.17.0 or later
 layout = dbc.Container([
-    html.H1(children='Mutfunc - precomputed mechanistic consequences of mutations'),
-    html.Div(id="print-variant-list"),
+    #html.H1(children='Mutfunc - precomputed mechanistic consequences of mutations'),
+    html.Div(id="print-variant-count"),
     html.Div([
         # Left column
         html.Div([
-            html.H2("Variants"),
+            #html.H2("Variants"),
             dbc.Container([dag.AgGrid(
                 id="variants",
-                style={"height": '500px', "width": "100%"},
+                style={
+                    "height": '500px',
+                    "width": "100%",
+                    "--ag-background-color": "#1a2232",           # --mi-surface
+                    #"--ag-odd-row-background-color": "#1d2840",   # between surface and surface-2 (stripe effect)
+                    "--ag-header-background-color": "#1a2232",    # --mi-surface (matches thead)
+                    "--ag-foreground-color": "#e7ecf5",           # --mi-text
+                    "--ag-border-color": "#344465",               # --mi-border-strong
+                    #"--ag-row-hover-color": "#243047",            # --mi-surface-2 (solid proxy for the rgba hover)
+                    #"--ag-selected-row-background-color": "rgba(25, 93, 230, 0.16)",  # --mi-primary @ 16% (matches .table active)
+                    "--ag-input-focus-border-color": "#195de6",   # --mi-primary
+                    "--ag-checkbox-checked-color": "#195de6",     # --mi-primary
+                    "--ag-header-foreground-color": "#ffffff",    # --mi-text-strong (matches thead th)
+                    "--ag-secondary-foreground-color": "#93a5c8", # --mi-muted (matches tbody td)
+                },
                 rowData=[],#df.to_dict('records'),
-                columnDefs=[{"field": i} for i in pq.read_schema('data/human-missense.parquet').names],
+                columnDefs=[
+                    {
+                        "checkboxSelection": True,
+                        "width": 50,
+                    },
+                    *[{"field": i, "headerName": i} for i in pq.read_schema('data/human-missense.parquet').names],
+                ],
                 columnSize="sizeToFit",
-                dashGridOptions={"rowSelection": {"mode": "singleRow"}},
+                #dashGridOptions={"rowSelection": {"mode": "singleRow"}},
+                dashGridOptions={"rowSelection": "multiple"},
             )], fluid=True, className="dbc dbc-ag-grid"),
         ], style={"flex": "1"}),#, "backgroundColor": "var(--bs-link-color)"}),#, "padding": "20px"}),#, "background": "#f0f0f0"}),
 
         # Right column
         html.Div([
-            html.H2("Structure"),
+            #html.H2("Structure"),
             dash_molstar.MolstarViewer(
-                id='viewer', style={'width': 'auto', 'height':'500px'}
+                id='viewer',
+                style={
+                    'width': 'auto',
+                    'height':'500px',
+                },
+                layout={
+                    'backgroundColor': 0x000000,
+                }
             ),
-        ], style={"flex": "1"}),#, "padding": "20px"}),#, "background": "#dce8f7"}),
+        ], style={
+            "flex": "1",
+            #'border': '1px solid #344465',  # --mi-border-strong
+            #'borderRadius': '0.5rem',        # --mi-radius
+            #'overflow': 'hidden',            # clips the viewer to the rounded corners
+        }),#, "padding": "20px"}),#, "background": "#dce8f7"}),
 
     ], style={"display": "flex", "gap": "10px"}),
 
 ], style={"padding": "20px"}, fluid=True)
 
 @callback(
-    Output("print-variant-list", "children"),
+    Output("print-variant-count", "children"),
     Input("variant-list", "data"),
 )
 def print_variant_list(data):
-    pprint(data)
-    #if not data:
-    #    return "No data yet — go to Page 1 first."
-    #return f"Hello, {data['name']}!"
-    return data
+    if not data:
+        return "variants"
+    return f"Showing results for {len(data)} submitted mutations"
 
 @callback(
     Output("variants",  "rowData"),
+    Output("variants", "selectedRows"),
     Input("variant-list", "data"),
 )
 def read_variants(variant_list):
@@ -67,7 +103,7 @@ def read_variants(variant_list):
         'data/human-missense.parquet',
         filters=[('variant_id', 'in', variant_list)],
     )
-    return df.to_dict('records')
+    return df.to_dict('records'), df.to_dict('records')
 
 def parse_varstr(s):
     # df_var[['uniprot_id', 'aa_pos', 'aa_ref', 'aa_alt']] = df_var.apply(lambda r: parse_varstr(r['protein_variant']), axis=1, result_type='expand')
@@ -78,18 +114,58 @@ def parse_varstr(s):
     #print(uniprot_id, aa_pos, aa_ref, aa_alt)
     return uniprot_id, aa_pos, aa_ref, aa_alt
 
+def build_bb_sc(pos_pathogenic, pos_benign):
+    bb_rep = Representation(type='cartoon', color='uniform')
+    bb_rep.set_type_params({'visuals': ['polymer-trace', 'polymer-gap']})
+    bb_rep.set_color_params({'value': 0x888888})
+
+    bb_targets = molstar_helper.get_targets(chain='A')
+    bb_comp = molstar_helper.create_component(label='Backbone', targets=bb_targets, representation=[bb_rep])
+
+    ps_rep = Representation(type='ball-and-stick', color='uniform')
+    bs_rep = Representation(type='ball-and-stick', color='uniform')
+    ps_rep.set_color_params({'value': 0xFF0000})
+    bs_rep.set_color_params({'value': 0x0000FF})
+
+    ps_sel  = molstar_helper.get_targets(chain='A', residue=pos_pathogenic)
+    bs_sel  = molstar_helper.get_targets(chain='A', residue=pos_benign)
+
+    ps_comp = molstar_helper.create_component(label='p_sidechains', targets=ps_sel, representation=[ps_rep])
+    bs_comp = molstar_helper.create_component(label='b_sidechains', targets=bs_sel, representation=[bs_rep])
+
+    component = [ bb_comp ]
+    if len(pos_pathogenic) > 0:
+        component.append(ps_comp)
+    if len(pos_benign) > 0:
+        component.append(bs_comp)
+
+    return component
+    #return [bb_comp, ps_comp, bs_comp]
+
 @callback(
     Output('viewer', 'data'),
     Input("variants", "selectedRows"),
+    #Input("variants", "rowData"),
     prevent_initial_call=True,
 )
-def show_structure(selected_row):
-    pprint(selected_row)
-    uniprot_id, pos, ref, alt = parse_varstr(selected_row[0]['variant_id'])
-    pprint(uniprot_id)
+def show_structure(selected_rows):#, variants_data):
+    if not selected_rows:
+        raise PreventUpdate
 
-    data = molstar_helper.parse_url(f'https://alphafold.ebi.ac.uk/files/AF-{uniprot_id}-F1-model_v6.pdb')
-    return data
+    uniprot_id, pos, ref, alt = parse_varstr(selected_rows[0]['variant_id'])
+
+    df_ = pd.DataFrame(selected_rows)
+    df_[['uniprot_id', 'pos', 'ref', 'alt']] = df_.apply(lambda r: parse_varstr(r['variant_id']), axis=1, result_type='expand')
+    df_ = df_.set_index('variant_id')
+
+    p_pos = df_.query('am_class == "pathogenic"')['pos'].tolist()
+    b_pos = df_.query('am_class == "benign"')['pos'].tolist()
+
+    return molstar_helper.parse_url(
+        f'https://alphafold.ebi.ac.uk/files/AF-{uniprot_id}-F1-model_v6.pdb',
+        component=build_bb_sc(p_pos, b_pos),
+        preset={'kind': 'empty'}
+    )
 
 #@app.callback(Output('viewer', 'data'),
 #              Input('load_protein', 'n_clicks'),

@@ -10,6 +10,7 @@ import dash
 from pprint import pprint
 
 import pandas as pd
+from dash.exceptions import PreventUpdate
 
 from dash import Dash, html, Input, Output, dcc, callback, State
 import dash_ag_grid as dag
@@ -38,6 +39,7 @@ examples = {
 }
 
 layout = dbc.Container([
+    #html.H1(children='Mutfunc - precomputed mechanistic consequences of mutations'),
     dbc.Row([
 
         # Left column
@@ -84,7 +86,7 @@ layout = dbc.Container([
     #dcc.Link("Parse variants", href="/variants")
     html.Button("Parse Variants", id="go-btn"),
     dcc.Location(id="redirect"),
-], fluid=True)
+], style={"padding": "20px"}, fluid=True)
 
 @callback(
     Output("variant-input", "value"),
@@ -94,7 +96,6 @@ layout = dbc.Container([
 def update_textarea(selected):
     return examples.get(selected, '')
 
-from dash.exceptions import PreventUpdate
 @callback(
     Output("redirect", "href"),
     Output("variant-list", "data"),
