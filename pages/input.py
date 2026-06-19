@@ -72,9 +72,10 @@ layout = dbc.Container([
 
         # Left column
         dbc.Col([
-            html.P("Enter your variants of interest below or upload a file. "
-                   "We currently only support human variants. Please use rsids (e.g. rs699); "
-                   "protein variants (e.g. P00533 R132C); or genomic coordinates (e.g. chr14 89993420 A/G)."),
+            html.P("Enter your variants of interest below."#: # or upload a file. "
+                   "We currently only support human variants."
+                    # Please use rsids (e.g. rs699); "
+                   "Please use protein variants (e.g. P00533/R132C)"), #; or genomic coordinates (e.g. chr14 89993420 A/G)."),
             dbc.Label("Choose example:"),
             dbc.Select(
                 id="example-select",

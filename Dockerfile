@@ -29,6 +29,17 @@ COPY pyproject.toml .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync
 
+# Download foldcomp platform-specific binary
+ARG TARGETPLATFORM
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+        curl https://mmseqs.com/foldcomp/foldcomp-linux-x86_64.tar.gz | tar xvfz - -C /usr/bin/; \
+    elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+        curl https://mmseqs.com/foldcomp/foldcomp-linux-arm64.tar.gz | tar xvfz - -C /usr/bin/; \
+    else \
+        echo Unsupported platform; \
+        exit 1; \
+    fi
+
 COPY *.py .
 COPY assets/* assets/
 COPY pages/* pages/

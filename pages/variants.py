@@ -14,10 +14,21 @@ import dash_bootstrap_components as dbc
 from dash_molstar.utils import molstar_helper
 from dash_molstar.utils.representations import Representation
 
+import foldcomp
+
 dash.register_page(__name__, path="/variants", title="Browse variants")
 #df = pd.read_parquet('data/human-missense.parquet').head(10)
 
-# Requires Dash 2.17.0 or later
+missense_cols_ = [
+    'variant_id',
+    #'ESM1b_LLR',
+    #'ESM1b_is_pathogenic',
+    'am_pathogenicity',
+    'am_class',
+    'pred_ddg',
+    #'plddt',
+]
+
 layout = dbc.Container([
     #html.H1(children='Mutfunc - precomputed mechanistic consequences of mutations'),
     html.Div(id="print-variant-count"),
@@ -48,7 +59,8 @@ layout = dbc.Container([
                         "checkboxSelection": True,
                         "width": 50,
                     },
-                    *[{"field": i, "headerName": i} for i in pq.read_schema('data/human-missense.parquet').names],
+                    #*[{"field": i, "headerName": i} for i in pq.read_schema('data/missense.parquet').names],
+                    *[{"field": i, "headerName": i} for i in missense_cols_ ],
                 ],
                 columnSize="sizeToFit",
                 #dashGridOptions={"rowSelection": {"mode": "singleRow"}},
@@ -100,9 +112,9 @@ def read_variants(variant_list):
         return [], "No variants loaded."
  
     df = pd.read_parquet(
-        'data/human-missense.parquet',
+        'data/missense.parquet',
         filters=[('variant_id', 'in', variant_list)],
-    )
+    )[missense_cols_]
     return df.to_dict('records'), df.to_dict('records')
 
 def parse_varstr(s):
@@ -161,11 +173,22 @@ def show_structure(selected_rows):#, variants_data):
     p_pos = df_.query('am_class == "pathogenic"')['pos'].tolist()
     b_pos = df_.query('am_class == "benign"')['pos'].tolist()
 
-    return molstar_helper.parse_url(
-        f'https://alphafold.ebi.ac.uk/files/AF-{uniprot_id}-F1-model_v6.pdb',
+    with foldcomp.open('data/monomers-db', ids=[f'{uniprot_id}-F1']) as db:
+        for pdb in db:
+            pdb_str = pdb[1]
+
+    return molstar_helper.parse_molecule(
+        pdb_str,
+        fmt='pdb',
         component=build_bb_sc(p_pos, b_pos),
         preset={'kind': 'empty'}
     )
+
+    #return molstar_helper.parse_url(
+    #    f'https://alphafold.ebi.ac.uk/files/AF-{uniprot_id}-F1-model_v6.pdb',
+    #    component=build_bb_sc(p_pos, b_pos),
+    #    preset={'kind': 'empty'}
+    #)
 
 #@app.callback(Output('viewer', 'data'),
 #              Input('load_protein', 'n_clicks'),
