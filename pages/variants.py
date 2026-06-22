@@ -1,10 +1,12 @@
 from pprint import pprint
 import dash
 from dash.exceptions import PreventUpdate
+import requests
+import util.variant_parser
 
 import pandas as pd
 import pyarrow.parquet as pq
-from dash import Dash, html, Input, Output, callback
+from dash import Dash, html, Input, Output, callback, dcc
 import dash_ag_grid as dag
 
 import dash_molstar
@@ -13,7 +15,7 @@ import dash_bootstrap_components as dbc
 
 from dash_molstar.utils import molstar_helper
 from dash_molstar.utils.representations import Representation
-
+import re
 import foldcomp
 
 dash.register_page(__name__, path="/variants", title="Browse variants")
@@ -29,6 +31,64 @@ missense_cols_ = [
     #'plddt',
 ]
 
+
+def g_convert(query=["CASQ2", "CASQ1", "GSTO1", "DMD", "GSTM2"], target='UNIPROTSWISSPROT_ACC', organism='hsapiens', numeric_namespace='ENTREZGENE_ACC'):
+    """
+    Query for HGNC gene names using g:convert (https://biit.cs.ut.ee/gprofiler/convert)
+    """
+    r = requests.post(url='https://biit.cs.ut.ee/gprofiler/api/convert/convert/', json=locals())
+    df_ = pd.DataFrame(r.json()['result'])
+    return df_
+
+variants_table_ = dag.AgGrid(
+    id="variants",
+    style={
+        "height": '500px',
+        "width": "100%",
+        "--ag-background-color": "#1a2232",           # --mi-surface
+        #"--ag-odd-row-background-color": "#1d2840",   # between surface and surface-2 (stripe effect)
+        "--ag-header-background-color": "#1a2232",    # --mi-surface (matches thead)
+        "--ag-foreground-color": "#e7ecf5",           # --mi-text
+        "--ag-border-color": "#344465",               # --mi-border-strong
+        #"--ag-row-hover-color": "#243047",            # --mi-surface-2 (solid proxy for the rgba hover)
+        #"--ag-selected-row-background-color": "rgba(25, 93, 230, 0.16)",  # --mi-primary @ 16% (matches .table active)
+        "--ag-input-focus-border-color": "#195de6",   # --mi-primary
+        "--ag-checkbox-checked-color": "#195de6",     # --mi-primary
+        "--ag-header-foreground-color": "#ffffff",    # --mi-text-strong (matches thead th)
+        "--ag-secondary-foreground-color": "#93a5c8", # --mi-muted (matches tbody td)
+    },
+    rowData=[],#df.to_dict('records'),
+    columnDefs=[
+        {
+            "checkboxSelection": True,
+            "width": 50,
+        },
+        {
+            "field": "input",
+            "headerName": "input",
+        },
+        {
+            "field": "variant_id",
+            "headerName": "variant_id",
+        },
+        {
+            "field": "am_pathogenicity",
+            "headerName": "am_pathogenicity",
+            "valueFormatter": {"function": "Number(params.value).toFixed(2)"},
+        },
+        {
+            "field": "pred_ddg",
+            "headerName": "pred_ddg",
+            "valueFormatter": {"function": "Number(params.value).toFixed(2)"},
+        },
+        #*[{"field": i, "headerName": i} for i in pq.read_schema('data/missense.parquet').names],
+        #*[{"field": i, "headerName": i} for i in ['input'] + missense_cols_ ],
+    ],
+    columnSize="sizeToFit",
+    #dashGridOptions={"rowSelection": {"mode": "singleRow"}},
+    dashGridOptions={"rowSelection": "multiple"},
+)
+
 layout = dbc.Container([
     #html.H1(children='Mutfunc - precomputed mechanistic consequences of mutations'),
     html.Div(id="print-variant-count"),
@@ -36,38 +96,13 @@ layout = dbc.Container([
         # Left column
         html.Div([
             #html.H2("Variants"),
-            dbc.Container([dag.AgGrid(
-                id="variants",
-                style={
-                    "height": '500px',
-                    "width": "100%",
-                    "--ag-background-color": "#1a2232",           # --mi-surface
-                    #"--ag-odd-row-background-color": "#1d2840",   # between surface and surface-2 (stripe effect)
-                    "--ag-header-background-color": "#1a2232",    # --mi-surface (matches thead)
-                    "--ag-foreground-color": "#e7ecf5",           # --mi-text
-                    "--ag-border-color": "#344465",               # --mi-border-strong
-                    #"--ag-row-hover-color": "#243047",            # --mi-surface-2 (solid proxy for the rgba hover)
-                    #"--ag-selected-row-background-color": "rgba(25, 93, 230, 0.16)",  # --mi-primary @ 16% (matches .table active)
-                    "--ag-input-focus-border-color": "#195de6",   # --mi-primary
-                    "--ag-checkbox-checked-color": "#195de6",     # --mi-primary
-                    "--ag-header-foreground-color": "#ffffff",    # --mi-text-strong (matches thead th)
-                    "--ag-secondary-foreground-color": "#93a5c8", # --mi-muted (matches tbody td)
-                },
-                rowData=[],#df.to_dict('records'),
-                columnDefs=[
-                    {
-                        "checkboxSelection": True,
-                        "width": 50,
-                    },
-                    #*[{"field": i, "headerName": i} for i in pq.read_schema('data/missense.parquet').names],
-                    *[{"field": i, "headerName": i} for i in missense_cols_ ],
-                ],
-                columnSize="sizeToFit",
-                #dashGridOptions={"rowSelection": {"mode": "singleRow"}},
-                dashGridOptions={"rowSelection": "multiple"},
-            )], fluid=True, className="dbc dbc-ag-grid"),
+            dcc.Loading(
+                id="loading",
+                type="default",
+                children=dbc.Container([variants_table_], fluid=True, className="dbc dbc-ag-grid"),
+            )
         ], style={"flex": "1"}),#, "backgroundColor": "var(--bs-link-color)"}),#, "padding": "20px"}),#, "background": "#f0f0f0"}),
-
+    
         # Right column
         html.Div([
             #html.H2("Structure"),
@@ -94,12 +129,13 @@ layout = dbc.Container([
 
 @callback(
     Output("print-variant-count", "children"),
-    Input("variant-list", "data"),
+    #Input("variant-list", "data"),
+    Input("variants",  "rowData"),
 )
 def print_variant_list(data):
     if not data:
         return "variants"
-    return f"Showing results for {len(data)} submitted mutations"
+    return f"Showing results for {len(data)} mapped variants"
 
 @callback(
     Output("variants",  "rowData"),
@@ -108,13 +144,42 @@ def print_variant_list(data):
 )
 def read_variants(variant_list):
     """Propagate variant-list store data into the AgGrid on page load."""
+
+    pattern = r'^.+/[A-Z]\d+[A-Z]$'
+
+    mapping = pd.DataFrame()
+    mapping['input'] = variant_list
+    mapping = mapping.query('input != ""')
+    mapping['vep'] = mapping['input'].map(lambda input: False if re.fullmatch(pattern, input) else True)
+    pprint(mapping)
+
+    if len(mapping.query('vep')) > 0:
+        query_vep = util.variant_parser.fetch_variants(mapping.query('vep')['input'])['missense']
+        mapping_vep = pd.DataFrame.from_records([(r['input'], r['gene_id'], str(r['protein_position']), r['amino_acids'] ) for r in query_vep], columns=['input', 'gene_id', 'protein_position', 'amino_acids']).drop_duplicates(keep='first')
+        mapping_vep['aa_ref'] = mapping_vep['amino_acids'].map(lambda s: s.split('/')[0])
+        mapping_vep['aa_alt'] = mapping_vep['amino_acids'].map(lambda s: s.split('/')[1])
+        mapping_vep = pd.concat([mapping_vep.reset_index(drop=True), g_convert(mapping_vep['gene_id'].tolist(), target='UNIPROTSWISSPROT_ACC').reset_index(drop=True)], axis=1)
+        mapping_vep['variant_id'] = mapping_vep['converted'] + '/' + mapping_vep['aa_ref'] + mapping_vep['protein_position'] + mapping_vep['aa_alt']
+        mapping_vep = mapping_vep[['input', 'variant_id']]
+    else:
+        mapping_vep = pd.DataFrame.from_records([], columns=['input', 'variant_id'])
+
+    mapping_merge = mapping.merge(mapping_vep, on='input', how='left')
+    mapping_merge['variant_id'] = list(map(lambda input, vep, variant_id: variant_id if vep else input, mapping_merge['input'], mapping_merge['vep'], mapping_merge['variant_id']))
+
     if not variant_list:
         return [], "No variants loaded."
- 
+
     df = pd.read_parquet(
         'data/missense.parquet',
-        filters=[('variant_id', 'in', variant_list)],
+        filters=[('variant_id', 'in', mapping_merge['variant_id'])],
     )[missense_cols_]
+
+    df = mapping_merge[['input', 'variant_id']].merge(df, on='variant_id')
+    #df = df.round({
+    #    'am_pathogenicity': 2,
+    #    'pred_ddg': 2
+    #})
     return df.to_dict('records'), df.to_dict('records')
 
 def parse_varstr(s):

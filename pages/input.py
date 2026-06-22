@@ -1,10 +1,11 @@
 import pandas as pd
 import util.db_utils as db
-import util.variant_parser as vp
+#import util.variant_parser as vp
 import os
 from collections import defaultdict
 from util.footer import show_footer
-
+import requests
+import util.variant_parser
 import dash
 
 from pprint import pprint
@@ -59,23 +60,25 @@ Q8IUR5/A409V
 
 examples = {
     '(User-defined)': '',
-    #'Mixed genomic/proteomic variants': "rs699\nrs6265\nP00533 R132C\nP09874 S568F\nP00451 G41C\nchr14 89993420 A/G",
+    'Mixed genomic/proteomic variants': "rs699\nrs6265\nP00533/R132C\nP09874/S568F\nP00451/G41C\nchr14 89993420 A/G",
+    'SNP examples from Fig. 1e': 'rs2070600\nrs74911261',
     'SLC25A4/P12235 ClinVar (Fig. 3e)': fig3e_,
     'KCNJ12/Q14500 COSMIC (Fig. 6c)': fig6c_,
     'TMTC1/Q8IUR5 COSMIC (Fig. 6d)': fig6d_,
     #'MAPK1/P28482 (Fig. 5c)': 'P28482',
 }
 
+help_msg = """Enter your variants of interest below.
+We currently only support human variants.
+Please use rsids (e.g. rs699); protein variants (e.g. P00533 R132C); or genomic coordinates (e.g. chr14 89993420 A/G).
+"""
 layout = dbc.Container([
     #html.H1(children='Mutfunc - precomputed mechanistic consequences of mutations'),
     dbc.Row([
 
         # Left column
         dbc.Col([
-            html.P("Enter your variants of interest below."#: # or upload a file. "
-                   "We currently only support human variants."
-                    # Please use rsids (e.g. rs699); "
-                   "Please use protein variants (e.g. P00533/R132C)"), #; or genomic coordinates (e.g. chr14 89993420 A/G)."),
+            html.P(help_msg),
             dbc.Label("Choose example:"),
             dbc.Select(
                 id="example-select",
@@ -84,7 +87,7 @@ layout = dbc.Container([
             ),
             dbc.Label("Enter variants (one per line):", class_name="mt-2"),
             dbc.Textarea(
-                id="variant-input",
+                id="user-input",
                 value='',
                 style={"height": "200px"},
             ),
@@ -119,7 +122,7 @@ layout = dbc.Container([
 ], style={"padding": "20px"}, fluid=True)
 
 @callback(
-    Output("variant-input", "value"),
+    Output("user-input", "value"),
     Input("example-select", "value"),
     prevent_initial_call=True,
 )
@@ -129,14 +132,15 @@ def update_textarea(selected):
 @callback(
     Output("redirect", "href"),
     Output("variant-list", "data"),
-    State("variant-input", "value"),
+    State("user-input", "value"),
     Input("go-btn", "n_clicks"),
     #prevent_initial_call=True, #doesn't stop it because of a documented Dash rule for components split across layouts
 )
-def go_to_page2(variants, n_clicks):
+def go_to_page2(user_input, n_clicks):
     if not n_clicks:
         raise PreventUpdate
-    return "/variants", variants.split()
+
+    return "/variants", user_input.split('\n')
 
 '''
 st.set_page_config(page_title='Mutfunc: Input', page_icon='🧬', layout='wide',)

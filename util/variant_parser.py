@@ -1,224 +1,312 @@
-import ast, gzip, random, os, tempfile, time, sqlite3, urllib.request
-import numpy as np, matplotlib, matplotlib.colors, matplotlib.pyplot as plt, seaborn as sns, pandas as pd #, streamlit as st
-#import py3Dmol, stmol
-#import streamlit as st
-import pandas as pd
-import requests
-from unipressed import IdMappingClient
-#from Bio.Data.IUPACData import protein_letters_3to1
+"""
+fetch_variants(): resolve a mixed list of variant identifiers to their
+missense consequences using the Ensembl REST API (VEP).
+
+Handles, in addition to all VEP-standard inputs:
+  - dbSNP rsIDs                  e.g.  rs699, rs6265
+  - UniProt acc + protein sub    e.g.  P00533 R132C
+                                       P00533:R132C
+                                       P00533/R132C
+  - genomic SPDI-ish / region    e.g.  chr14 89993420 A/G
+
+Design notes
+------------
+* Inputs are bucketed by type, each bucket hits the most appropriate VEP
+  endpoint, all via POST batch calls (<=200 ids/call) so a few-thousand-row
+  input stays to a few dozen HTTP requests.
+* UniProt protein substitutions are not directly VEP-able. They are mapped
+  UniProt-accession -> Ensembl translation (ENSP) via the xrefs endpoint
+  (batched, cached), then submitted as protein-level HGVS (ENSP:p.Xaa#Yaa)
+  to the VEP /hgvs endpoint, which back-maps to genomic coordinates.
+* Only consequences containing "missense_variant" are returned.
+* 429 rate-limit responses are honoured via Retry-After with backoff.
+
+Requires: requests
+"""
+
+from __future__ import annotations
+
+import re
 import time
+import itertools
+from typing import Iterable, Iterator
 
-# Function to query the Ensembl REST API
-#st.cache_data(persist='disk')
-def fetch_variant_info(variants):
+import requests
+
+SERVER = "https://rest.ensembl.org"
+SPECIES = "homo_sapiens"
+BATCH = 200                 # Ensembl POST limit
+MAX_RETRIES = 5
+SESSION = requests.Session()
+SESSION.headers.update({"Content-Type": "application/json",
+                        "Accept": "application/json"})
+
+# Three-letter <-> one-letter amino acids for HGVS protein notation
+_AA1to3 = {
+    "A": "Ala", "R": "Arg", "N": "Asn", "D": "Asp", "C": "Cys", "Q": "Gln",
+    "E": "Glu", "G": "Gly", "H": "His", "I": "Ile", "L": "Leu", "K": "Lys",
+    "M": "Met", "F": "Phe", "P": "Pro", "S": "Ser", "T": "Thr", "W": "Trp",
+    "Y": "Tyr", "V": "Val", "U": "Sec", "*": "Ter", "X": "Xaa",
+}
+
+# UniProt accession: O/P/Q + digits/letters, or the newer 10-char form
+_UNIPROT = r"[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2}"
+_PROTSUB = re.compile(
+    rf"^\s*(?P<acc>{_UNIPROT})\s*[\s:/]\s*"
+    r"(?P<ref>[A-Z*])(?P<pos>\d+)(?P<alt>[A-Z*])\s*$"
+)
+_RSID = re.compile(r"^\s*rs\d+\s*$", re.IGNORECASE)
+# "chr14 89993420 A/G"  or "14 89993420 A/G" -> VEP default region format
+_GENOMIC = re.compile(
+    r"^\s*(?:chr)?(?P<chrom>[\dXYMT]+)\s+(?P<pos>\d+)\s+"
+    r"(?P<ref>[ACGT-]+)\s*/\s*(?P<alt>[ACGT-]+)\s*$",
+    re.IGNORECASE,
+)
+
+
+# --------------------------------------------------------------------------- #
+# low-level HTTP with rate-limit handling
+# --------------------------------------------------------------------------- #
+def _post(endpoint: str, payload: dict, params: dict | None = None) -> list | dict:
+    url = f"{SERVER}{endpoint}"
+    for attempt in range(MAX_RETRIES):
+        r = SESSION.post(url, json=payload, params=params or {})
+        if r.status_code == 429:
+            wait = float(r.headers.get("Retry-After", 1.0))
+            time.sleep(wait + 0.1)
+            continue
+        if r.status_code in (500, 502, 503, 504):
+            time.sleep(2 ** attempt)
+            continue
+        r.raise_for_status()
+        return r.json()
+    r.raise_for_status()
+    return []
+
+
+def _chunks(seq: list, n: int) -> Iterator[list]:
+    for i in range(0, len(seq), n):
+        yield seq[i:i + n]
+
+
+# --------------------------------------------------------------------------- #
+# UniProt accession -> Ensembl ENSP translation id
+# --------------------------------------------------------------------------- #
+_ensp_cache: dict[str, str | None] = {}
+
+
+def _map_uniprot_to_ensp(accs: Iterable[str]) -> dict[str, str | None]:
+    """Resolve UniProt accessions to an Ensembl translation (ENSP) id.
+
+    Uses GET /xrefs/symbol/<species>/<acc>?object_type=translation. There is no
+    POST batch for xrefs, so this is per-accession but cached.
     """
-    Fetch variant information from the Ensembl Variant Recoder endpoint.
-
-    Parameters:
-    - variants: List of variant identifiers (e.g., rsIDs, HGVS notations).
-
-    Returns:
-    - JSON response from the API.
-    """
-    server = "https://rest.ensembl.org"
-    endpoint = "/variant_recoder/homo_sapiens"
-    headers = {"Content-Type": "application/json"}
-    
-    if not variants:
-        return []
-
-    # For batch queries, use POST request
-    data = {"ids": variants}
-    response = requests.post(f"{server}{endpoint}", headers=headers, json=data)
-
-    # Debugging: Print raw response data
-    #st.subheader("Debugging: Raw API Response")
-    #st.json(response.json())  # Display raw JSON response in the app
-
-    if response.status_code != 200:
-        st.error(f"Error {response.status_code}: {response.json().get('error', 'Unknown error')}")
-        return []
-
-    return response.json()
-
-# fetching variant info based on genomic location
-#st.cache_data(persist='disk')
-def fetch_variant_vep(chr, region, mutation, species="human"):
-    """
-    Fetch variant information from the Ensembl VEP Region endpoint.
-
-    Parameters:
-    - species: Species name (e.g., 'homo_sapiens').
-    - region: Genomic region in the format 'chr:start-end' (e.g., '1:1000-2000').
-    - allele: Allele change in the format 'reference/variant' (e.g., 'A/T').
-
-    Returns:
-    - JSON response from the API if successful, otherwise an error message.
-    """
-    server = "https://rest.ensembl.org"
-    endpoint = f"/vep/{species}/region/{chr}:{region}-{region}/{mutation}?content-type=application/json&uniprot=1"
-    headers = {"Content-Type": "application/json", "uniprot": "1"}
-
-    url = f"{server}{endpoint}"
-    
-    try:
-        response = requests.get(url, headers=headers)
-        
-        # Check if the request was successful
-        if response.status_code != 200:
-            return {"error": f"HTTP {response.status_code}: {response.text}"}
-
-        return response.json()
-    except requests.RequestException as e:
-        return {"error": f"Request failed: {e}"}
-    
-def read_vep_result(result):
-    # check if result is a list
-    try: 
-        result = result[0]
-    except:
-        return
-    # check if result is a dict
-    if type(result) != dict:
-        return
-    if result["most_severe_consequence"] != "missense_variant":
-        return
-    position = result["transcript_consequences"][0]["protein_start"]
-    prot_id = result["transcript_consequences"][0]["uniprot_isoform"][0].split("-")[0]
-    aa_from = result["transcript_consequences"][0]["amino_acids"][0]
-    aa_to = result["transcript_consequences"][0]["amino_acids"][-1]
-    # create string
-    return f"{prot_id}/{aa_from}{position}{aa_to}"
-
-def translate_genomic_coords(input):
-    var_coords = [e.split(" ") for e in input]
-    results = [fetch_variant_vep(var[0][3:], var[1], var[2][-1]) for var in var_coords]
-    #st.write(results)
-    prot_vars = [read_vep_result(result) for result in results]
-
-    # create dict but only if values not none
-    return {prot_vars[i]:input[i] for i in range(len(input)) if prot_vars[i] is not None}
-
-
-def query_prot_ids(ensemble_ids, input_ids):
-    """
-    Query UniProt for protein IDs mapped from Ensembl Protein IDs.
-
-    Parameters:
-    - ensemble_ids: List of Ensembl Protein IDs with variants (e.g., "ENSP00000483018.1:p.Gly229Asp").
-
-    Returns:
-    - List of UniProt internal IDs with variants.
-    """
-    # Split the IDs into ENSP and variant
-    ensemble_ids = [element.split(":") for element in ensemble_ids]
-    variants = [e[1][2:] for e in ensemble_ids] # remove ".p"
-    ensemble_ids = [e[0] for e in ensemble_ids]
-    #st.write(ensemble_ids)
-
-    ensemble_to_input = dict(zip(ensemble_ids, input_ids))
-    ensemble_to_variant = dict(zip(ensemble_ids, variants))
-
-    # Submit a mapping request to UniProt
-    request = IdMappingClient.submit(source="Ensembl_Protein", dest="UniProtKB-Swiss-Prot", ids=set(ensemble_ids))
-
-    max_retries = 10  # Maximum number of retries
-    retry_count = 0
-    with st.spinner("Looking up Uniprot ids..."):
-        while retry_count < max_retries:
-            try:
-                result = list(request.each_result())
-            except Exception as e:
-                st.info(f"Failed to fetch UniProt IDs. Retrying... ({retry_count}/{max_retries})")
-                retry_count += 1
-                time.sleep(2)
+    out: dict[str, str | None] = {}
+    for acc in {a for a in accs if a not in _ensp_cache}:
+        url = f"{SERVER}/xrefs/symbol/{SPECIES}/{acc}"
+        for attempt in range(MAX_RETRIES):
+            r = SESSION.get(url, params={"object_type": "translation"})
+            if r.status_code == 429:
+                time.sleep(float(r.headers.get("Retry-After", 1.0)) + 0.1)
                 continue
+            if r.status_code == 400:           # nothing found
+                _ensp_cache[acc] = None
+                break
+            if r.status_code in (500, 502, 503, 504):
+                time.sleep(2 ** attempt)
+                continue
+            r.raise_for_status()
+            hits = r.json()
+            _ensp_cache[acc] = hits[0]["id"] if hits else None
             break
-
-    # TODO: add try except and waiting logic if result takes time
-    #st.write(result)
-
-    #mapping = {e["from"]: e["to"] for e in result}
-
-    # Get UniProt IDs and convert them to internal IDs with variants
-    uniprot_id_map = list(set({(e["from"], e["to"]) for e in result}))#set(mapping.values())
-    input_ids_left = [ensemble_to_input[e[0]] for e in uniprot_id_map]
-    uniprot_ids = [e[1] for e in uniprot_id_map]
-    #st.write(variants)
-    filtered_variants = [ensemble_to_variant[e[0]] for e in uniprot_id_map]
-    internal_ids = [convert_to_internal_id(uniprot_id, variant) for uniprot_id,variant in zip(uniprot_ids,filtered_variants)]
-
-    return dict(zip(internal_ids,input_ids_left)) # Return results if successful
-
-def convert_to_internal_id(uniprot_id, variant):
-    position = variant[3:-3]
-    short_variant = protein_letters_3to1[variant[-3:]]+position+protein_letters_3to1[variant[:3]]
-    return uniprot_id+"/"+short_variant
-
-# Function to process the API response into a structured DataFrame
-def process_variant_info(variant_info):
-    # get the proteins 
-    rows = []
-    all_hgvsp = []
-    input_vars = []
-    for variant in variant_info:
-        for nucleotide, details in variant.items():
-            input_variant = details.get("input", "N/A")
-            hgvsp = details.get("hgvsp", [])
-            all_hgvsp.extend(hgvsp)
-            input_vars.extend([input_variant]*len(hgvsp))
-
-    protein_ids = query_prot_ids(all_hgvsp, input_vars)
-
-    return protein_ids #pd.DataFrame(rows)
-
-def parse_variants(variant_lines):
-    """
-    Parse a list of variant lines into structured lists for rs IDs, genomic positions, and protein variants.
-
-    Parameters:
-    - variant_lines: List of strings, each representing a variant.
-
-    Returns:
-    - A dictionary with lists of variants:
-        {
-            "rs_variants": [...],
-            "genomic_positions": [...],
-            "protein_variants": [...],
-            "error_ids": [...],
-        }
-    """
-    rs_variants = []
-    genomic_positions = []
-    protein_variants = []
-    error_ids = []
-
-    for line in variant_lines:
-        stripped_line = line.strip()
-        if stripped_line:
-            if stripped_line.startswith("rs"):
-                # rs variant
-                rs_variants.append(stripped_line)
-            elif stripped_line.startswith("chr"):
-                # Genomic position
-                parts = stripped_line.split()
-                if len(parts) == 3 and "/" in parts[2]:
-                    genomic_positions.append(stripped_line)
-                else:
-                    error_ids.append(stripped_line)
-            else:
-                # Protein variation
-                parts = stripped_line.split(" ")
-                if len(parts) == 2 and parts[1][0].isalpha() and parts[1][-1].isalpha():
-                    protein_variants.append(f"{parts[0]}/{parts[1]}")
-                else:
-                    error_ids.append(stripped_line)
         else:
-            error_ids.append(stripped_line)
+            _ensp_cache[acc] = None
+    for acc in accs:
+        out[acc] = _ensp_cache.get(acc)
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# parsing / bucketing
+# --------------------------------------------------------------------------- #
+def _classify(raw: str):
+    """Return (kind, normalized) where kind in
+    {'rsid','protsub','genomic','vep'}."""
+    s = raw.strip()
+    if _RSID.match(s):
+        return "rsid", s.lower()
+    m = _PROTSUB.match(s)
+    if m:
+        return "protsub", m
+    m = _GENOMIC.match(s)
+    if m:
+        gd = m.groupdict()
+        ref, alt = gd["ref"].upper(), gd["alt"].upper()
+        # VEP default region format: "chr start end allele strand"
+        pos = int(gd["pos"])
+        end = pos + len(ref) - 1
+        return "genomic", f'{gd["chrom"]} {pos} {end} {ref}/{alt} 1'
+    return "vep", s            # assume it is VEP-standard (HGVS, region, etc.)
+
+
+def _protsub_to_hgvs(m: re.Match, ensp: str | None) -> str | None:
+    if ensp is None:
+        return None
+    ref3 = _AA1to3.get(m.group("ref").upper())
+    alt3 = _AA1to3.get(m.group("alt").upper())
+    if not ref3 or not alt3:
+        return None
+    return f'{ensp}:p.{ref3}{m.group("pos")}{alt3}'
+
+
+# --------------------------------------------------------------------------- #
+# missense extraction
+# --------------------------------------------------------------------------- #
+def _extract_missense(vep_record: dict, original: str,
+                      uniprot_variant_id: str | None = None) -> list[dict]:
+    rows = []
+    for tc in vep_record.get("transcript_consequences", []):
+        cons = tc.get("consequence_terms", [])
+        if "missense_variant" not in cons:
+            continue
+        rows.append({
+            "input": original,
+            "variant_id": vep_record.get("id"),
+            "uniprot_variant_id": uniprot_variant_id,
+            "location": vep_record.get("seq_region_name") and
+                        f'{vep_record["seq_region_name"]}:'
+                        f'{vep_record.get("start")}-{vep_record.get("end")}',
+            "allele": vep_record.get("allele_string"),
+            "gene_symbol": tc.get("gene_symbol"),
+            "gene_id": tc.get("gene_id"),
+            "transcript_id": tc.get("transcript_id"),
+            "protein_id": tc.get("protein_id"),
+            "amino_acids": tc.get("amino_acids"),
+            "protein_position": tc.get("protein_start"),
+            "hgvsp": tc.get("hgvsp"),
+            "sift_prediction": tc.get("sift_prediction"),
+            "polyphen_prediction": tc.get("polyphen_prediction"),
+            "consequence_terms": cons,
+        })
+    return rows
+
+
+# --------------------------------------------------------------------------- #
+# public API
+# --------------------------------------------------------------------------- #
+def fetch_variants(identifiers: list[str], extra_vep_params: dict | None = None
+                   ) -> dict:
+    """
+    Fetch missense variant consequences for a mixed list of identifiers.
+
+    Returns
+    -------
+    {
+      "missense":   [ {row}, ... ],   # one row per missense transcript_consequence
+      "unmatched":  [ original_str, ... ],   # inputs VEP returned no missense for
+      "unresolved": [ original_str, ... ],   # inputs that could not be parsed/mapped
+    }
+    """
+    params = {"hgvs": 1, "sift": 1, "polyphen": 1, "canonical": 1}
+    if extra_vep_params:
+        params.update(extra_vep_params)
+
+    # bucket inputs --------------------------------------------------------- #
+    rsids:    list[tuple[str, str]] = []   # (id_for_api, original)
+    genomic:  list[tuple[str, str]] = []
+    vep_std:  list[tuple[str, str]] = []
+    hgvs:     list[tuple[str, str]] = []   # protein-sub derived HGVS
+    unresolved: list[str] = []
+
+    protsub_matches: list[tuple[re.Match, str]] = []
+    # original input -> normalized "ACC/refPOSalt" id (only for protein subs)
+    uniprot_vid: dict[str, str] = {}
+    for raw in identifiers:
+        kind, val = _classify(raw)
+        if kind == "rsid":
+            rsids.append((val, raw))
+        elif kind == "genomic":
+            genomic.append((val, raw))
+        elif kind == "protsub":
+            protsub_matches.append((val, raw))
+            uniprot_vid[raw] = (f'{val.group("acc")}/{val.group("ref").upper()}'
+                                f'{val.group("pos")}{val.group("alt").upper()}')
+        else:
+            vep_std.append((val, raw))
+
+    # resolve protein subs to ENSP HGVS ------------------------------------- #
+    if protsub_matches:
+        accs = [m.group("acc") for m, _ in protsub_matches]
+        mapping = _map_uniprot_to_ensp(accs)
+        for m, raw in protsub_matches:
+            h = _protsub_to_hgvs(m, mapping.get(m.group("acc")))
+            if h:
+                hgvs.append((h, raw))
+            else:
+                unresolved.append(raw)
+
+    missense: list[dict] = []
+    matched_inputs: set[str] = set()
+
+    def _run(endpoint, key, items, extra=None):
+        """items: list of (api_value, original). POST in batches."""
+        # keep original mapping; api values may collide so track per-batch order
+        for chunk in _chunks(items, BATCH):
+            payload = {key: [v for v, _ in chunk]}
+            if extra:
+                payload.update(extra)
+            data = _post(endpoint, payload, params)
+            if isinstance(data, dict):
+                data = [data]
+            # VEP echoes "input"; match it back to originals
+            by_input: dict[str, str] = {}
+            for v, orig in chunk:
+                by_input.setdefault(v, orig)
+            for rec in data:
+                orig = by_input.get(rec.get("input"), rec.get("input"))
+                rows = _extract_missense(rec, orig, uniprot_vid.get(orig))
+                if rows:
+                    missense.extend(rows)
+                    matched_inputs.add(orig)
+
+    if rsids:
+        _run(f"/vep/{SPECIES}/id", "ids", rsids)
+    if genomic:
+        _run(f"/vep/{SPECIES}/region", "variants", genomic)
+    if vep_std:
+        # /region accepts the VEP default + many HGVS/SPDI strings; if some are
+        # HGVS-only they'll error per-id, so route anything containing ':' that
+        # looks like HGVS to /hgvs, the rest to /region.
+        hgvs_like = [(v, o) for v, o in vep_std if re.search(r":[cgmnpr]\.", v)]
+        region_like = [(v, o) for v, o in vep_std if (v, o) not in hgvs_like]
+        if region_like:
+            _run(f"/vep/{SPECIES}/region", "variants", region_like)
+        if hgvs_like:
+            hgvs.extend(hgvs_like)
+    if hgvs:
+        _run(f"/vep/{SPECIES}/hgvs", "hgvs_notations", hgvs)
+
+    all_inputs = {raw for raw in identifiers}
+    unmatched = sorted(all_inputs - matched_inputs - set(unresolved))
 
     return {
-        "rs_variants": rs_variants,
-        "genomic_positions": genomic_positions,
-        "protein_variants": protein_variants,
-        "error_ids": error_ids,
+        "missense": missense,
+        "unmatched": unmatched,
+        "unresolved": unresolved,
     }
+
+
+if __name__ == "__main__":
+    import json
+    test = [
+        "rs699", "rs6265",
+        "P00533 R132C", "P09874 S568F", "P00451 G41C",
+        "P00533:R132C", "P09874:S568F", "P00451:G41C",
+        "P00533/R132C", "P09874/S568F", "P00451/G41C",
+        "chr14 89993420 A/G",
+    ]
+    result = fetch_variants(test)
+    print(f"missense rows : {len(result['missense'])}")
+    print(f"unmatched     : {result['unmatched']}")
+    print(f"unresolved    : {result['unresolved']}")
+    print(json.dumps(result["missense"][:3], indent=2))
