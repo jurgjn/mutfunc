@@ -59,10 +59,10 @@ variants_table_ = dag.AgGrid(
     },
     rowData=[],#df.to_dict('records'),
     columnDefs=[
-        {
-            "checkboxSelection": True,
-            "width": 50,
-        },
+        #{
+        #    "checkboxSelection": True,
+        #    "width": 50,
+        #},
         {
             "field": "input",
             "headerName": "input",
@@ -85,46 +85,43 @@ variants_table_ = dag.AgGrid(
         #*[{"field": i, "headerName": i} for i in ['input'] + missense_cols_ ],
     ],
     columnSize="sizeToFit",
-    #dashGridOptions={"rowSelection": {"mode": "singleRow"}},
-    dashGridOptions={"rowSelection": "multiple"},
+    dashGridOptions={"rowSelection": {"mode": "singleRow"}},
+    #dashGridOptions={"rowSelection": "multiple"},
+)
+
+structure_viewer_ = dash_molstar.MolstarViewer(
+    id='viewer',
+    style={
+        'width': 'auto',
+        'height':'500px',
+    },
+    layout={
+        'backgroundColor': 0x000000,
+    }
 )
 
 layout = dbc.Container([
-    #html.H1(children='Mutfunc - precomputed mechanistic consequences of mutations'),
     html.Div(id="print-variant-count"),
     html.Div([
         # Left column
         html.Div([
-            #html.H2("Variants"),
             dcc.Loading(
-                id="loading",
+                id="loading_variants",
                 type="default",
                 children=dbc.Container([variants_table_], fluid=True, className="dbc dbc-ag-grid"),
             )
-        ], style={"flex": "1"}),#, "backgroundColor": "var(--bs-link-color)"}),#, "padding": "20px"}),#, "background": "#f0f0f0"}),
+        ], style={"flex": "1"}),
     
         # Right column
         html.Div([
-            #html.H2("Structure"),
-            dash_molstar.MolstarViewer(
-                id='viewer',
-                style={
-                    'width': 'auto',
-                    'height':'500px',
-                },
-                layout={
-                    'backgroundColor': 0x000000,
-                }
+            dcc.Loading(
+                id="loading_structure",
+                type="default",
+                children=dbc.Container([structure_viewer_], fluid=True),
             ),
-        ], style={
-            "flex": "1",
-            #'border': '1px solid #344465',  # --mi-border-strong
-            #'borderRadius': '0.5rem',        # --mi-radius
-            #'overflow': 'hidden',            # clips the viewer to the rounded corners
-        }),#, "padding": "20px"}),#, "background": "#dce8f7"}),
+        ], style={"flex": "1"}),
 
     ], style={"display": "flex", "gap": "10px"}),
-
 ], style={"padding": "20px"}, fluid=True)
 
 @callback(
@@ -180,6 +177,13 @@ def read_variants(variant_list):
     #    'am_pathogenicity': 2,
     #    'pred_ddg': 2
     #})
+
+    pprint(df)
+
+    list_uniprot_id = set(df['variant_id'].map(lambda variant_id: variant_id.split('/')[0]).tolist())
+    pockets = pd.read_parquet('data/pockets.parquet', filters=[('uniprot_id', 'in', list_uniprot_id)],)
+    pprint(pockets)
+
     return df.to_dict('records'), df.to_dict('records')
 
 def parse_varstr(s):
@@ -242,12 +246,40 @@ def show_structure(selected_rows):#, variants_data):
         for pdb in db:
             pdb_str = pdb[1]
 
-    return molstar_helper.parse_molecule(
+    structure = molstar_helper.parse_molecule(
         pdb_str,
         fmt='pdb',
         component=build_bb_sc(p_pos, b_pos),
         preset={'kind': 'empty'}
     )
+
+    molstar_data = [ structure ]
+
+    list_uniprot_id = set(df_['uniprot_id'].tolist())
+    pockets = pd.read_parquet('data/pockets.parquet', filters=[('uniprot_id', 'in', list_uniprot_id)],)
+    pocket_str = pockets.head(1)['pocket_cl_str'].squeeze()
+    if type(pocket_str) is str:
+        rep = Representation(type='molecular-surface')
+        rep.color = 'uniform'
+        rep.set_color_params({'value': 0xFFB6C1})
+        rep.set_type_params({'alpha': 0.5})
+    
+        pocket_component = molstar_helper.create_component(
+            label="Pocket",
+            targets=molstar_helper.get_targets(chain=" "),
+            representation=rep,
+        )
+
+        pocket = molstar_helper.parse_molecule(
+            pocket_str,
+            fmt='pdb',
+            component=pocket_component,
+            preset={'kind': 'empty'},
+        )
+
+        molstar_data.append(pocket)
+
+    return molstar_data
 
     #return molstar_helper.parse_url(
     #    f'https://alphafold.ebi.ac.uk/files/AF-{uniprot_id}-F1-model_v6.pdb',
