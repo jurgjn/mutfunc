@@ -47,4 +47,4 @@ COPY util/* util/
 
 EXPOSE 8050
 
-ENTRYPOINT ["uv", "run", "gunicorn", "app:server", "--bind", "0.0.0.0:8050"]
+ENTRYPOINT ["uv", "run", "gunicorn", "app:server", "--bind", "0.0.0.0:8501"]
