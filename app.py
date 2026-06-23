@@ -52,26 +52,25 @@ app.layout = html.Div([
             "padding": "0 1rem",
         }
     ),
+    html.Footer(
+        dbc.Container(
+            dcc.Markdown(
+                "Prof. Dr. Pedro Beltrao  \n"
+                "[E-Mail](mailto:beltrao@imsb.biol.ethz.ch)  \n"
+                "Otto-Stern-Weg 3, 8093 Zurich, Switzerland",
+                link_target="_blank",
+            ),
+            fluid=True,
+            style={"padding": "1rem"},
+        ),
+        style={
+            "marginTop": "2rem",
+            "borderTop": "1px solid #dee2e6",
+            "fontSize": "0.875rem",
+            "color": "#6c757d",
+        },
+    ),
 ])
-
-'''
-# Force Bootstrap's dark color mode at the <html> level.
-app.index_string = """<!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
-<head>{%metas%}<title>{%title%}</title>{%favicon%}{%css%}</head>
-<body>
-  {%app_entry%}
-  <footer>{%config%}{%scripts%}{%renderer%}</footer>
-</body>
-</html>"""
-'''
-
-'''
-app = Dash(external_stylesheets=[
-    #dbc.themes.SUPERHERO
-    "/assets/mutfunc.css",
-], use_pages=True)
-'''
 
 server = app.server
 
