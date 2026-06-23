@@ -1,0 +1,5 @@
+
+/* assets/custom.css */
+.multiline-header .ag-header-cell-text {
+    white-space: pre-line;
+}

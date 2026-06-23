@@ -65,21 +65,40 @@ variants_table_ = dag.AgGrid(
         #},
         {
             "field": "input",
-            "headerName": "input",
+            "headerName": "Input",
+            "headerClass": "multiline-header",
+            "wrapHeaderText": True,
+            "autoHeaderHeight": True,
         },
         {
             "field": "variant_id",
-            "headerName": "variant_id",
+            "headerName": "Missense\nvariant",
+            "headerClass": "multiline-header",
+            "wrapHeaderText": True,
+            "autoHeaderHeight": True,
         },
         {
             "field": "am_pathogenicity",
-            "headerName": "am_pathogenicity",
+            "headerName": "Pathogenicity\n(AMS)",
+            "headerClass": "multiline-header",
+            "wrapHeaderText": True,
+            "autoHeaderHeight": True,
             "valueFormatter": {"function": "Number(params.value).toFixed(2)"},
         },
         {
             "field": "pred_ddg",
-            "headerName": "pred_ddg",
+            "headerName": "Stability\n(ddG)",
+            "headerClass": "multiline-header",
+            "wrapHeaderText": True,
+            "autoHeaderHeight": True,
             "valueFormatter": {"function": "Number(params.value).toFixed(2)"},
+        },
+        {
+            "field": "pocket_score_str",
+            "headerName": "Pocket\nscore",
+            "headerClass": "multiline-header",
+            "wrapHeaderText": True,
+            "autoHeaderHeight": True,
         },
         #*[{"field": i, "headerName": i} for i in pq.read_schema('data/missense.parquet').names],
         #*[{"field": i, "headerName": i} for i in ['input'] + missense_cols_ ],
@@ -170,21 +189,28 @@ def read_variants(variant_list):
     df = pd.read_parquet(
         'data/missense.parquet',
         filters=[('variant_id', 'in', mapping_merge['variant_id'])],
-    )[missense_cols_]
+    )#[missense_cols_]
 
     df = mapping_merge[['input', 'variant_id']].merge(df, on='variant_id')
-    #df = df.round({
-    #    'am_pathogenicity': 2,
-    #    'pred_ddg': 2
-    #})
-
-    pprint(df)
+    df[['uniprot_id', 'pos', 'ref', 'alt']] = df.apply(lambda r: parse_varstr(r['variant_id']), axis=1, result_type='expand')
 
     list_uniprot_id = set(df['variant_id'].map(lambda variant_id: variant_id.split('/')[0]).tolist())
     pockets = pd.read_parquet('data/pockets.parquet', filters=[('uniprot_id', 'in', list_uniprot_id)],)
+    print('pockets')
     pprint(pockets)
 
-    return df.to_dict('records'), df.to_dict('records')
+    pocket_resid = pockets.explode('pocket_resid')[['uniprot_id', 'pocket_resid', 'pocket_id', 'pocket_score_combined_scaled']]\
+        .sort_values('pocket_score_combined_scaled', ascending=False)\
+        .reset_index(drop=True)\
+        .groupby(['uniprot_id', 'pocket_resid'])\
+        .head(1)
+
+    df = df.merge(pocket_resid, left_on=['uniprot_id', 'pos'], right_on=['uniprot_id', 'pocket_resid'], how='left')
+    df['pocket_score_str'] = df['pocket_score_combined_scaled'].apply(lambda x: f'{x:.2g}')
+    df['pocket_score_str'] = df['pocket_score_str'].replace('nan', '')
+
+    return df.to_dict('records'), df.head(1).to_dict('records')
+    #return df.to_dict('records'), df.to_dict('records')
 
 def parse_varstr(s):
     # df_var[['uniprot_id', 'aa_pos', 'aa_ref', 'aa_alt']] = df_var.apply(lambda r: parse_varstr(r['protein_variant']), axis=1, result_type='expand')
@@ -255,10 +281,18 @@ def show_structure(selected_rows):#, variants_data):
 
     molstar_data = [ structure ]
 
-    list_uniprot_id = set(df_['uniprot_id'].tolist())
-    pockets = pd.read_parquet('data/pockets.parquet', filters=[('uniprot_id', 'in', list_uniprot_id)],)
-    pocket_str = pockets.head(1)['pocket_cl_str'].squeeze()
-    if type(pocket_str) is str:
+    # If selected variant has a pocket, read & show pocket surface
+    uniprot_id = selected_rows[0]['uniprot_id']
+    pocket_id = selected_rows[0]['pocket_id']
+    print('attempt to load', uniprot_id, pocket_id)
+    if not(pocket_id is None):
+        print('new')
+        print(uniprot_id)
+        print(pocket_id)
+
+        pockets = pd.read_parquet('data/pockets.parquet', filters=[('uniprot_id', '==', uniprot_id), ('pocket_id', '==', pocket_id)],)
+        pocket_str = pockets.head(1)['pocket_cl_str'].squeeze()
+
         rep = Representation(type='molecular-surface')
         rep.color = 'uniform'
         rep.set_color_params({'value': 0xFFB6C1})
