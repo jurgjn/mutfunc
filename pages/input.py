@@ -3,7 +3,7 @@ import util.db_utils as db
 #import util.variant_parser as vp
 import os
 from collections import defaultdict
-from util.footer import show_footer
+#from util.footer import show_footer
 import requests
 import util.variant_parser
 import dash

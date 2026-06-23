@@ -79,7 +79,7 @@ variants_table_ = dag.AgGrid(
         },
         {
             "field": "am_pathogenicity",
-            "headerName": "Pathogenicity\n(AMS)",
+            "headerName": "Patho-\ngenicity",
             "headerClass": "multiline-header",
             "wrapHeaderText": True,
             "autoHeaderHeight": True,
@@ -94,6 +94,20 @@ variants_table_ = dag.AgGrid(
             "valueFormatter": {"function": "Number(params.value).toFixed(2)"},
         },
         {
+            "field": "pdockq_str",
+            "headerName": "pDockQ",
+            "headerClass": "multiline-header",
+            "wrapHeaderText": True,
+            "autoHeaderHeight": True,
+        },
+        #{
+        #    "field": "interaction_id",
+        #    "headerName": "Best\ninteraction",
+        #    "headerClass": "multiline-header",
+        #    "wrapHeaderText": True,
+        #    "autoHeaderHeight": True,
+        #},
+        {
             "field": "pocket_score_str",
             "headerName": "Pocket\nscore",
             "headerClass": "multiline-header",
@@ -107,6 +121,8 @@ variants_table_ = dag.AgGrid(
     dashGridOptions={"rowSelection": {"mode": "singleRow"}},
     #dashGridOptions={"rowSelection": "multiple"},
 )
+#'pdockq_str'] = df['pdockq'].map(str).replace('nan', '')
+#    df['interaction_id'
 
 structure_viewer_ = dash_molstar.MolstarViewer(
     id='viewer',
@@ -143,6 +159,21 @@ layout = dbc.Container([
     ], style={"display": "flex", "gap": "10px"}),
 ], style={"padding": "20px"}, fluid=True)
 
+def suppl_ppi_residues(df_models):
+    #df_models = suppl_ppi_models(pdockq)
+    cols_ = ['uniprot_id', 'ifresid', 'pdockq', 'interaction_id']
+    q_ne_ = 'uniprot_id1 != uniprot_id2'
+    q_eq_ = 'uniprot_id1 == uniprot_id2'
+    df_ppi_residues = pd.concat([
+        df_models.query(q_ne_).rename({'uniprot_id1': 'uniprot_id', 'ifresid1': 'ifresid',}, axis=1)[cols_],
+        df_models.query(q_eq_).rename({'uniprot_id1': 'uniprot_id', 'ifresid1': 'ifresid',}, axis=1)[cols_],
+        df_models.query(q_ne_).rename({'uniprot_id2': 'uniprot_id', 'ifresid2': 'ifresid',}, axis=1)[cols_],
+    ], axis=0)
+    df_ppi_residues['ifresid'] = df_ppi_residues['ifresid'].map(lambda l: set(int(r[1:]) for r in l.split(',') if r != ''))
+    df_ppi_residues = df_ppi_residues.explode('ifresid').sort_values('pdockq', ascending=False).groupby(['uniprot_id', 'ifresid']).head(1)
+    return df_ppi_residues #.sort_values(['uniprot_id', 'ifresid']).rename({'pdockq': 'ifresid_pdockq',}, axis=1)
+
+
 @callback(
     Output("print-variant-count", "children"),
     #Input("variant-list", "data"),
@@ -167,7 +198,7 @@ def read_variants(variant_list):
     mapping['input'] = variant_list
     mapping = mapping.query('input != ""')
     mapping['vep'] = mapping['input'].map(lambda input: False if re.fullmatch(pattern, input) else True)
-    pprint(mapping)
+    #pprint(mapping)
 
     if len(mapping.query('vep')) > 0:
         query_vep = util.variant_parser.fetch_variants(mapping.query('vep')['input'])['missense']
@@ -196,8 +227,8 @@ def read_variants(variant_list):
 
     list_uniprot_id = set(df['variant_id'].map(lambda variant_id: variant_id.split('/')[0]).tolist())
     pockets = pd.read_parquet('data/pockets.parquet', filters=[('uniprot_id', 'in', list_uniprot_id)],)
-    print('pockets')
-    pprint(pockets)
+    #print('pockets')
+    #pprint(pockets)
 
     pocket_resid = pockets.explode('pocket_resid')[['uniprot_id', 'pocket_resid', 'pocket_id', 'pocket_score_combined_scaled']]\
         .sort_values('pocket_score_combined_scaled', ascending=False)\
@@ -208,6 +239,18 @@ def read_variants(variant_list):
     df = df.merge(pocket_resid, left_on=['uniprot_id', 'pos'], right_on=['uniprot_id', 'pocket_resid'], how='left')
     df['pocket_score_str'] = df['pocket_score_combined_scaled'].apply(lambda x: f'{x:.2g}')
     df['pocket_score_str'] = df['pocket_score_str'].replace('nan', '')
+
+    ppi_models = pd.read_parquet('data/multimers.parquet', filters=[
+        [('uniprot_id1', 'in', list_uniprot_id)],
+        [('uniprot_id2', 'in', list_uniprot_id)],
+    ])
+
+    ppi_resid = suppl_ppi_residues(ppi_models)
+    df = df.merge(ppi_resid, left_on=['uniprot_id', 'pos'], right_on=['uniprot_id', 'ifresid'], how='left')
+    df['pdockq_str'] = df['pdockq'].map(str).replace('nan', '')
+    df['interaction_id'] = df['interaction_id'].fillna('')
+    pprint(df)
+    pprint(ppi_resid)
 
     return df.to_dict('records'), df.head(1).to_dict('records')
     #return df.to_dict('records'), df.to_dict('records')
@@ -284,11 +327,10 @@ def show_structure(selected_rows):#, variants_data):
     # If selected variant has a pocket, read & show pocket surface
     uniprot_id = selected_rows[0]['uniprot_id']
     pocket_id = selected_rows[0]['pocket_id']
-    print('attempt to load', uniprot_id, pocket_id)
+    #print('attempt to load', uniprot_id, pocket_id)
     if not(pocket_id is None):
-        print('new')
-        print(uniprot_id)
-        print(pocket_id)
+        #print(uniprot_id)
+        #print(pocket_id)
 
         pockets = pd.read_parquet('data/pockets.parquet', filters=[('uniprot_id', '==', uniprot_id), ('pocket_id', '==', pocket_id)],)
         pocket_str = pockets.head(1)['pocket_cl_str'].squeeze()
