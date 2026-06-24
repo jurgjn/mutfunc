@@ -10,7 +10,7 @@ apt-get update --quiet \
 && apt-get install --yes --quiet build-essential curl git python3-pymol libboost-all-dev \
 && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.2 /uv /uvx /bin/
 
 # Suppress `warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.`
 ENV UV_LINK_MODE=copy
@@ -20,14 +20,6 @@ ENV UV_SYSTEM_PYTHON=1
 
 # https://docs.astral.sh/uv/guides/integration/docker/#compiling-bytecode
 ENV UV_COMPILE_BYTECODE=1
-
-WORKDIR /app/mutfunc
-COPY data/* data/
-
-COPY pyproject.toml .
-
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync
 
 # Download foldcomp platform-specific binary
 ARG TARGETPLATFORM
@@ -40,14 +32,22 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         exit 1; \
     fi
 
+WORKDIR /app/mutfunc
+COPY data/* data/
+
+COPY pyproject.toml uv.lock .
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync
+
 COPY *.py .
-COPY assets/* assets/
-COPY pages/* pages/
-COPY util/* util/
+COPY assets/ assets/
+COPY pages/ pages/
+COPY util/ util/
 
 ARG MUTFUNC_BUILD
 ENV MUTFUNC_BUILD=$MUTFUNC_BUILD
 
-EXPOSE 8050
+EXPOSE 8501
 
 ENTRYPOINT ["uv", "run", "gunicorn", "app:server", "--bind", "0.0.0.0:8501"]
