@@ -45,6 +45,9 @@ COPY assets/* assets/
 COPY pages/* pages/
 COPY util/* util/
 
+ARG MUTFUNC_BUILD
+ENV MUTFUNC_BUILD=$MUTFUNC_BUILD
+
 EXPOSE 8050
 
 ENTRYPOINT ["uv", "run", "gunicorn", "app:server", "--bind", "0.0.0.0:8501"]
