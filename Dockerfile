@@ -42,8 +42,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY *.py .
 COPY assets/ assets/
+
 COPY pages/ pages/
 COPY util/ util/
+
+# Add Google Analytics for web server image
+COPY assets_gtag/analytics.js assets/analytics.js
 
 ARG MUTFUNC_BUILD
 ENV MUTFUNC_BUILD=$MUTFUNC_BUILD

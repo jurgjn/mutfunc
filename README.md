@@ -1,8 +1,3 @@
-# mutfunc2
+# mutfunc
 
-## Quick start
-```bash
-git clone git@github.com:jurgjn/mutfunc.git
-cd mutfunc
-pip install -e .
-```
+[Mutfunc web server](http://mutfunc.com)
