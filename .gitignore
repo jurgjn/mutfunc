@@ -4,6 +4,11 @@ resources/
 __pycache__/
 *.pyc
 
+data/*
+
+# Built images
+*.tar
+
 __pycache__/
 
 #https://github.com/github/gitignore/blob/main/Global/macOS.gitignore
