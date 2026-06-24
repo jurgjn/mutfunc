@@ -161,13 +161,13 @@ layout = dbc.Container([
 
 def suppl_ppi_residues(df_models):
     #df_models = suppl_ppi_models(pdockq)
-    cols_ = ['uniprot_id', 'ifresid', 'pdockq', 'interaction_id']
+    cols_ = ['uniprot_id', 'ifresid', 'pdockq', 'interaction_id', 'chain']
     q_ne_ = 'uniprot_id1 != uniprot_id2'
     q_eq_ = 'uniprot_id1 == uniprot_id2'
     df_ppi_residues = pd.concat([
-        df_models.query(q_ne_).rename({'uniprot_id1': 'uniprot_id', 'ifresid1': 'ifresid',}, axis=1)[cols_],
-        df_models.query(q_eq_).rename({'uniprot_id1': 'uniprot_id', 'ifresid1': 'ifresid',}, axis=1)[cols_],
-        df_models.query(q_ne_).rename({'uniprot_id2': 'uniprot_id', 'ifresid2': 'ifresid',}, axis=1)[cols_],
+        df_models.query(q_ne_).rename({'uniprot_id1': 'uniprot_id', 'ifresid1': 'ifresid', 'chain1': 'chain',}, axis=1)[cols_],
+        df_models.query(q_eq_).rename({'uniprot_id1': 'uniprot_id', 'ifresid1': 'ifresid', 'chain1': 'chain',}, axis=1)[cols_],
+        df_models.query(q_ne_).rename({'uniprot_id2': 'uniprot_id', 'ifresid2': 'ifresid', 'chain2': 'chain',}, axis=1)[cols_],
     ], axis=0)
     df_ppi_residues['ifresid'] = df_ppi_residues['ifresid'].map(lambda l: set(int(r[1:]) for r in l.split(',') if r != ''))
     df_ppi_residues = df_ppi_residues.explode('ifresid').sort_values('pdockq', ascending=False).groupby(['uniprot_id', 'ifresid']).head(1)
@@ -264,13 +264,13 @@ def parse_varstr(s):
     #print(uniprot_id, aa_pos, aa_ref, aa_alt)
     return uniprot_id, aa_pos, aa_ref, aa_alt
 
-def build_bb_sc(pos_pathogenic, pos_benign):
+def build_bb_sc(pos_pathogenic, pos_benign, label='bb'):
     bb_rep = Representation(type='cartoon', color='uniform')
     bb_rep.set_type_params({'visuals': ['polymer-trace', 'polymer-gap']})
     bb_rep.set_color_params({'value': 0x888888})
 
     bb_targets = molstar_helper.get_targets(chain='A')
-    bb_comp = molstar_helper.create_component(label='Backbone', targets=bb_targets, representation=[bb_rep])
+    bb_comp = molstar_helper.create_component(label=label, targets=bb_targets, representation=[bb_rep])
 
     ps_rep = Representation(type='ball-and-stick', color='uniform')
     bs_rep = Representation(type='ball-and-stick', color='uniform')
@@ -280,8 +280,8 @@ def build_bb_sc(pos_pathogenic, pos_benign):
     ps_sel  = molstar_helper.get_targets(chain='A', residue=pos_pathogenic)
     bs_sel  = molstar_helper.get_targets(chain='A', residue=pos_benign)
 
-    ps_comp = molstar_helper.create_component(label='p_sidechains', targets=ps_sel, representation=[ps_rep])
-    bs_comp = molstar_helper.create_component(label='b_sidechains', targets=bs_sel, representation=[bs_rep])
+    ps_comp = molstar_helper.create_component(label=f'{label}_p_sidechains', targets=ps_sel, representation=[ps_rep])
+    bs_comp = molstar_helper.create_component(label=f'{label}_b_sidechains', targets=bs_sel, representation=[bs_rep])
 
     component = [ bb_comp ]
     if len(pos_pathogenic) > 0:
@@ -302,6 +302,12 @@ def show_structure(selected_rows):#, variants_data):
     if not selected_rows:
         raise PreventUpdate
 
+    if selected_rows[0]['pdockq'] is None:
+        return show_structure_monomer(selected_rows)
+    else:
+        return show_structure_multimer(selected_rows)
+
+def show_structure_monomer(selected_rows):
     uniprot_id, pos, ref, alt = parse_varstr(selected_rows[0]['variant_id'])
 
     df_ = pd.DataFrame(selected_rows)
@@ -352,147 +358,33 @@ def show_structure(selected_rows):#, variants_data):
             component=pocket_component,
             preset={'kind': 'empty'},
         )
-
         molstar_data.append(pocket)
 
     return molstar_data
 
-    #return molstar_helper.parse_url(
-    #    f'https://alphafold.ebi.ac.uk/files/AF-{uniprot_id}-F1-model_v6.pdb',
-    #    component=build_bb_sc(p_pos, b_pos),
-    #    preset={'kind': 'empty'}
-    #)
+def show_structure_multimer(selected_rows):
+    #print('show_structure_multimer')
+    #pprint(selected_rows[0])
 
-#@app.callback(Output('viewer', 'data'),
-#              Input('load_protein', 'n_clicks'),
-#              prevent_initial_call=True)
-#def display_output(yes):
-#    data = molstar_helper.parse_url('https://files.rcsb.org/download/3U7Y.cif')
-#    return data
+    uniprot_id, pos, ref, alt = parse_varstr(selected_rows[0]['variant_id'])
+    interaction_id = selected_rows[0]['interaction_id']
+    chain_id = selected_rows[0]['chain']
 
-#if __name__ == '__main__':
-#    app.run(debug=True)
+    if chain_id == 'A':
+        pathogenic_A = [pos]
+        pathogenic_B = []
+    elif chain_id == 'B':
+        pathogenic_A = []
+        pathogenic_B = [pos]
 
-'''
-import streamlit as st
-import py3Dmol, stmol
-import util.db_utils as db
-import urllib.request
-import pandas as pd
-from util.footer import show_footer
+    with foldcomp.open('data/multimers-db', ids=[ f'{interaction_id}_A', f'{interaction_id}_B' ]) as db:
+        pdb_str_A, pdb_str_B = [ pdb[1] for pdb in db ]
+    
+    #print(len(pdb_str_A), len(pdb_str_B))
 
-st.set_page_config(page_title='Mutfunc: Results', page_icon='🧬', layout='wide',)
+    structure_A = molstar_helper.parse_molecule(pdb_str_A, fmt='pdb', component=build_bb_sc(pathogenic_A, [], label='backbone_A'), preset={'kind': 'empty'})#, label='chain_A')
+    structure_B = molstar_helper.parse_molecule(pdb_str_B, fmt='pdb', component=build_bb_sc(pathogenic_B, [], label='backbone_B'), preset={'kind': 'empty'})#, label='chain_B')
 
-page_ = '/app/Mutfunc_Home.py'
-st.page_link(page_, label='Input Coordinates', icon='⏪')
-
-st.title("Mutfunc - Browse Results 🕵️‍♂️")
-
-#prot_variants = st.session_state.get("prot_variants", {}) # Not needed?
-lookup_df = st.session_state.get("lookup_df", pd.DataFrame())
-
-@st.cache_data
-def read_af2_v4(af2_id):
-    url_ = f'https://alphafold.ebi.ac.uk/files/AF-{af2_id}-F1-model_v4.pdb'
-    with urllib.request.urlopen(url_) as url:
-        return url.read().decode('utf-8')
-
-if not(len(lookup_df.query('`Inferred type` != "error"')) > 0):
-    st.info("No variants available for browsing. Please input variants first.")
-else:
-    df_ = db.query_missense(lookup_df['Translated variant'])
-    df_ = lookup_df.merge(df_, left_on='Translated variant', right_on='variant_id')
-    #st.write(df_)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        tab1, tab2 = st.tabs(["Variants", "Pockets"])
-        with tab1:
-            st.write('Select a row to display the variant in the structure ☑️')
-            event = st.dataframe(
-                df_,
-                column_order = ['Input variant','variant_id', 'am_pathogenicity', 'am_class', 'pred_ddg', 'pocketscore', 'interface'],
-                #column_config=column_configuration,
-                use_container_width=True,
-                hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row",
-            )
-            if len(event['selection']['rows']) > 0:
-                sel_variant_index_ = event['selection']['rows']
-            else:
-                sel_variant_index_ = 0
-
-            r_sel_ = df_.loc[sel_variant_index_].squeeze()
-            #st.write(r_sel_.variant_id)
-
-            uniprot_id, aa_pos, aa_ref, aa_alt = db.parse_varstr(r_sel_.variant_id)
-            #st.write(uniprot_id)
-            #st.write(aa_pos)
-            #st.write(aa_ref)
-            #st.write(aa_alt)
-
-        with tab2:
-            st.write('Select a row to show/hide pockets ☑️')
-            df_pocket = db.query_pockets(uniprot_id)
-            sel_pocket = st.dataframe(
-                df_pocket,
-                column_order = ['uniprot_id', 'pocket_id', 'pocket_score', 'pocket_resid'],
-                use_container_width=True,
-                hide_index=True,
-                on_select='rerun',
-                selection_mode='multi-row',
-            )
-
-    with col2:
-        # Add (monomer) structure
-        pdb_ = read_af2_v4(uniprot_id)
-        xyzview = py3Dmol.view()
-        xyzview.addModel(pdb_, format='pdb')
-        xyzview.setStyle({'model': 0}, {    
-            'cartoon': {
-                'color': 'lightgrey',#'white',
-                #'colorscheme': {
-                #    'prop': 'resi',
-                #    #'map': colors_pocket,
-                #},
-                'arrows': True,
-            }
-        })
-
-        # Add variants to structure
-        xyzview.addStyle({'resi': aa_pos}, {'stick': {'colorscheme': 'purpleCarbon'}})
-        xyzview.addLabel( #https://3dmol.org/doc/GLViewer.html#addLabel
-            f'{aa_ref}{aa_pos}{aa_alt}',
-            { #https://3dmol.csb.pitt.edu/doc/LabelSpec.html
-                'fontColor': '#ba181b' if r_sel_.am_class == 'pathogenic' else '#0077b6' if r_sel_.am_class == 'benign' else 'gray',
-                'backgroundColor': 'lightgray',
-                #'fontOpacity': 0.5,
-                'backgroundOpacity': 0.7,
-            },
-            {'resi': aa_pos},
-        )
-
-        # Add user-selected pockets to structure viewer
-        for i, r in df_pocket.loc[sel_pocket['selection']['rows']].iterrows():
-            xyzview.addModel(r.pocket_cl, format='pdb')
-            xyzview.setStyle({'model': -1}, {})
-            xyzview.addSurface(py3Dmol.VDW, {'opacity': 0.7, 'color': 'pink'}, {'model': -1})
-
-        # Set point-of-view/background 
-        xyzview.setBackgroundColor('#eeeeee')
-        #xyzview.zoomTo({'resi': aa_pos}) # center exactly onto residue
-        xyzview.zoomTo({ # center onto within 30 Angostroms
-            'within': {
-                'distance': 30,
-                'sel': {'resi': aa_pos},
-            },
-        })
-        stmol.showmol(xyzview, width=800)
-
-        st.write('### Variant details')
-        st.dataframe(r_sel_, use_container_width=True, height=800)
-
-# footer 
-show_footer()
-'''
+    #print(dir(structure_A))
+    #print(dir(structure_B))
+    return [structure_A, structure_B]
