@@ -40,6 +40,8 @@ def g_convert(query=["CASQ2", "CASQ1", "GSTO1", "DMD", "GSTM2"], target='UNIPROT
     df_ = pd.DataFrame(r.json()['result'])
     return df_
 
+SCORE_COL_WIDTH = 130
+
 variants_table_ = dag.AgGrid(
     id="variants",
     style={
@@ -69,6 +71,7 @@ variants_table_ = dag.AgGrid(
             "headerClass": "multiline-header",
             "wrapHeaderText": True,
             "autoHeaderHeight": True,
+            "width": 240,
         },
         {
             "field": "variant_id",
@@ -84,6 +87,7 @@ variants_table_ = dag.AgGrid(
             "wrapHeaderText": True,
             "autoHeaderHeight": True,
             "valueFormatter": {"function": "Number(params.value).toFixed(2)"},
+            "width": SCORE_COL_WIDTH,
         },
         {
             "field": "pred_ddg",
@@ -92,6 +96,7 @@ variants_table_ = dag.AgGrid(
             "wrapHeaderText": True,
             "autoHeaderHeight": True,
             "valueFormatter": {"function": "Number(params.value).toFixed(2)"},
+            "width": SCORE_COL_WIDTH,
         },
         {
             "field": "pdockq_str",
@@ -99,6 +104,7 @@ variants_table_ = dag.AgGrid(
             "headerClass": "multiline-header",
             "wrapHeaderText": True,
             "autoHeaderHeight": True,
+            "width": SCORE_COL_WIDTH,
         },
         #{
         #    "field": "interaction_id",
@@ -113,16 +119,15 @@ variants_table_ = dag.AgGrid(
             "headerClass": "multiline-header",
             "wrapHeaderText": True,
             "autoHeaderHeight": True,
+            "width": SCORE_COL_WIDTH,
         },
         #*[{"field": i, "headerName": i} for i in pq.read_schema('data/missense.parquet').names],
         #*[{"field": i, "headerName": i} for i in ['input'] + missense_cols_ ],
     ],
     columnSize="sizeToFit",
-    dashGridOptions={"rowSelection": {"mode": "singleRow"}},
+    dashGridOptions={"rowSelection": {"mode": "singleRow"}, "suppressHorizontalScroll": True,},
     #dashGridOptions={"rowSelection": "multiple"},
 )
-#'pdockq_str'] = df['pdockq'].map(str).replace('nan', '')
-#    df['interaction_id'
 
 structure_viewer_ = dash_molstar.MolstarViewer(
     id='viewer',
@@ -143,7 +148,7 @@ layout = dbc.Container([
             dcc.Loading(
                 id="loading_variants",
                 type="default",
-                children=dbc.Container([variants_table_], fluid=True, className="dbc dbc-ag-grid"),
+                children=dbc.Container([variants_table_], fluid=True, className="dbc dbc-ag-grid", style={"padding": "0"}),
             )
         ], style={"flex": "1"}),
     
@@ -152,12 +157,13 @@ layout = dbc.Container([
             dcc.Loading(
                 id="loading_structure",
                 type="default",
-                children=dbc.Container([structure_viewer_], fluid=True),
+                children=dbc.Container([structure_viewer_], fluid=True, style={"padding": "0"}),
             ),
+            html.Div(id="print-structure-info", style={"textAlign": "center"}),
         ], style={"flex": "1"}),
 
     ], style={"display": "flex", "gap": "10px"}),
-], style={"padding": "20px"}, fluid=True)
+], style={"padding": "2px"}, fluid=True)
 
 def suppl_ppi_residues(df_models):
     #df_models = suppl_ppi_models(pdockq)
@@ -183,6 +189,19 @@ def print_variant_list(data):
     if not data:
         return "variants"
     return f"Showing results for {len(data)} mapped variants"
+
+@callback(
+    Output("print-structure-info", "children"),
+    Input("variants", "selectedRows"),
+)
+def print_structure_info(selected_rows):
+    if not selected_rows:
+        return ""
+    
+    if selected_rows[0]['pdockq'] is None:
+        return f"monomer: {selected_rows[0]['uniprot_id']}"
+    else:
+        return f"multimer: {selected_rows[0]['interaction_id']}"
 
 @callback(
     Output("variants",  "rowData"),
